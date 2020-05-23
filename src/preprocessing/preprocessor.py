@@ -11,19 +11,26 @@ class Preprocessor:
 	def load_data(self):
 		file = open("data/landkreise-in-germany.geojson", 'r')
 		data_dump = geojson.load(file)
+		file.close()
+		
 		district_list = [ DistrictPolygon(district)
 										 	for district in data_dump["features"]] 
 		
+		district_graph = nx.Graph()
 
 		for district1 in district_list:
+			district_graph.add_node(district1)
 			for district2 in district_list:
 				if(not district1 == district2 and district1.do_bounding_boxes_intersect(district2)):
 					if(not district2 in district1.neighbours):
-						district1.neighbours.append(district2)
+						district1.neighbours.append(district2)	
 					if(not district1 in district2.neighbours):
 						district2.neighbours.append(district1)
+					
+					district_graph.add_edge(district1, district2)
 
-		graph = nx.Graph()
+		return district_graph
+
 
 	def build_graph(district_list):
 		for district in district_list:
