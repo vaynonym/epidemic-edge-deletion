@@ -53,6 +53,7 @@ class Algorithm:
 
 		return partitions
 
+# We need a wrapper class in order to have hashable lists for the set of Partitions
 class Partition:
 	def __init__(self, blocks):
 		self.blocks = blocks
