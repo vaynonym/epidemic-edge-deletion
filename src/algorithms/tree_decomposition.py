@@ -9,30 +9,26 @@ class Tree_Decomposer:
 	def __init__(self, graph):
     	# generates random graph on 30 nodes and a heuristic creates a TD
 		# TODO: replace with self.graph = graph and call function to compute TD
-		self.graph = nx.algorithms.approximation.treewidth.treewidth_min_degree(nx.fast_gnp_random_graph(30, 1/2, None, False))
-		#self.niceTD = nx.algorithms.approximation.treewidth.treewidth_min_degree(graph)
-		self.niceTD = self.graph[1]
+		self.TD = nx.algorithms.approximation.treewidth.treewidth_min_degree(nx.fast_gnp_random_graph(30, 1/2, None, False))
+		self.graph = self.TD[1]
+		self.niceTD = nx.DiGraph()
 	
 	def make_nice_tree_decomposition(self):
 		self.choose_root()
+		self.make_directed()
 		queue = [self.graph_root]
 		nodes_seen = []
 		for node in queue:
-    		# parent nodes land multiple times in the queue but will be removed again by remembering them in bags_seen
-			# -> won't happen if we change to directed graphs and neighbors() to successors()
-			queue = queue + [nx.all_neighbors(self.niceTD, node)]
+			queue = queue + [self.graph.successors(node)]
 			nodess_seen = nodes_seen + [node]
 			queue = [x for x in queue if x not in nodes_seen]
 			# TODO: special case bag of child equals bag of parent ?
 			# if the node is a leaf then nothing has to be done
-			if len(list(nx.all_neighbors(self.niceTD, node))) == 1:
+			if len(list(self.graph.successors(node))) == 1:
 				continue
 			# these three function calls will construct the niceTD structur from the node to each of the children
 			self.create_introduce_nodes(node)
-			# 
-			# if a parent has exactly one child then this can be done
-			# TODO remove parent from set of neighbours
-			if nx.all_neighbors(self.niceTD, node) == 1:
+			if self.graph.successors(node) == 1:
 				self.create_forget_nodes(node)
 			self.create_join_node(node)
 		return self.niceTD
@@ -41,21 +37,20 @@ class Tree_Decomposer:
 	def choose_root(self):
     	# for now chosen randomly
 		# list(graph) returns a list of the nodes (random.choice needs iterable object)
-		self.graph_root = random.choice(list(self.niceTD))
+		self.graph_root = random.choice(list(self.graph))
 		self.niceTD.add_node(self.graph_root)
 
 	# when a node in the TD contains a vertex in its bag that none of its neighbours' bags contain then create introduce nodes until this is not true anymore
 	def create_introduce_nodes(self, node):
 		last_node=node
-		union_of_neighbours = frozenset()
-		for x in set(nx.neighbors(self.niceTD, node)):
-    			union_of_neighbours.union(x)
-		# TODO: remove parent from set of neighbours#
-		node_without_neighbour = set(node)
-		node_without_neighbour.discard(node.intersection(union_of_neighbours))
+		union_of_children = frozenset()
+		for x in set(self.graph.successors(node)):
+    			union_of_children.union(x)
+		node_without_children = set(node)
+		node_without_children.discard(node.intersection(union_of_children))
 		# frozenset() == set() returns true
-		if not frozenset() == node_without_neighbour:
-			for vertex in node_without_neighbour:
+		if not frozenset() == node_without_children:
+			for vertex in node_without_children:
 				temp = set(last_node)
 				temp.discard(vertex)
 				last_node=frozenset(temp)
@@ -68,12 +63,11 @@ class Tree_Decomposer:
 	# when a node in the TD does not contain a vertex that is in the intersection of the childrens' bags then create forget nodes until this is not true anymore
 	def create_forget_nodes(self, node):
 		last_node=node
-		# TODO: remove parent from set of neighbours
-		intersection_of_neighbours = random.choice(list(nx.neighbors(self.niceTD, node)))
-		for x in set(nx.neighbors(self.niceTD, node)):
-			intersection_of_neighbours.intersection(x)
-		if not frozenset() == intersection_of_neighbours:
-			for vertex in intersection_of_neighbours:
+		intersection_of_children = random.choice(list(self.graph.successors(node)))
+		for x in set(self.graph.successors(node)):
+			intersection_of_children.intersection(x)
+		if not frozenset() == intersection_of_children:
+			for vertex in intersection_of_children:
 				temp=set(last_node)
 				temp.add(vertex)
 				last_node=frozenset(temp)
@@ -90,10 +84,10 @@ class Tree_Decomposer:
 		self.niceTD.add_edge(node, left_node)
 		self.niceTD.add_edge(node, right_node)
 
-    	# TODO: compute how to separate the children
+    	# computes how to separate the children
 		best_partition = []
 		best_partition_value = (0,0)
-		list_of_partitions = self.generate_partitions_with_2_blocks(set(nx.neighbors(self.niceTD, node)),2)
+		list_of_partitions = self.generate_partitions_with_2_blocks(set(self.graph.successors(node)),2)
 		for partition in list_of_partitions:
 			new_partition_value = self.evaluate_partition(node, partition)
 
@@ -105,7 +99,7 @@ class Tree_Decomposer:
 				best_partition_value = new_partition_value
 				best_partition = partition
 		
-		# TODO: assign children to left and right node
+		# assigns children to left and right node
 		for left_child in best_partition[0]:
 			self.niceTD.add_edge(left_node, left_child)
 
@@ -137,7 +131,7 @@ class Tree_Decomposer:
 					list_of_partitions.remove(partition)
 		return list_of_partitions
 
-	# takes a partition and evalutes the number of introduce and forget nodes that can be saved
+	# takes a partition and evalutes the number of introduce
 	def evaluate_partition(self, node, partition):
 		# computes the number of introduce nodes one can save using this partition
 		union_of_children_left = frozenset()
@@ -157,8 +151,17 @@ class Tree_Decomposer:
 		for x in partition[0]:
     			intersection_of_children_left = intersection_of_children_left.intersection(x)
 
-		intersection_of_children_right = random.choice(list(nx.neighbors(self.niceTD, node)))
+		intersection_of_children_right = random.choice(list(self.graph.successors(node)))
 		for x in partition[1]:
     			intersection_of_children_right = intersection_of_children_right.intersection(x)
 
 		return (introduce_nodes_saved, len(intersection_of_children_left)+len(intersection_of_children_right))
+
+	# transforms an undirected TD to a directed TD where only parents have an edge to its child(ren)
+	def make_directed(self):
+		self.graph = self.graph.to_directed()
+		queue = [self.graph_root]
+		for parent in queue:
+			for child in list(self.graph.predecessors(parent)):
+					self.graph.remove_edge(child, parent)
+			queue = queue + [self.graph.successors(parent)]
