@@ -139,8 +139,6 @@ class Tree_Decomposer:
 
 	# takes a partition and evalutes the number of introduce and forget nodes that can be saved
 	def evaluate_partition(self, node, partition):
-		partition_value_left = 0
-		partition_value_right = 0
 		# computes the number of introduce nodes one can save using this partition
 		union_of_children_left = frozenset()
 		for x in partition[0]:
@@ -163,4 +161,4 @@ class Tree_Decomposer:
 		for x in partition[1]:
     			intersection_of_children_right = intersection_of_children_right.intersection(x)
 
-		return (partition_value_left + partition_value_right, intersection_of_children_left+intersection_of_children_right)
+		return (introduce_nodes_saved, len(intersection_of_children_left)+len(intersection_of_children_right))
