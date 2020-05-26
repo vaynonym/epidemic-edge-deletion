@@ -42,7 +42,7 @@ def test_generate_all_functions_of_partition():
     partition = alg.Partition([[1,2,6,4,5], [6,10,3], [9,7,11,12], [13,14,15,16]])
     max_size = 7
     # act
-    result = algo.all_functions_from_partition_to_range(partition, max_size)
+    result = algo.generate_all_functions_from_partition_to_range(partition, max_size)
 
     for function1 in result:
         for block in partition.blocks:

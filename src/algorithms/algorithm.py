@@ -8,10 +8,15 @@ class Algorithm:
 	def execute(self):
 		return True
 
-	def generate_possible_component_states_of_bag(self, bag, size):
-		states = []
-		all_partitions = self.generate_partitions_of_bag_of_size(bag, size)
-		
+	def generate_possible_component_states_of_bag(self, bag, h):
+		states = set()
+		all_partitions = self.generate_partitions_of_bag_of_size(bag, h)
+		for partition in all_partitions:
+			all_functions = self.generate_all_functions_from_partition_to_range(partition, h)
+			for function in all_function:
+				states.add( (partition, function))
+
+		return states
 			
 	def generate_partitions_of_bag_of_size(self, bag, size):
 		partitions = set()
@@ -56,7 +61,7 @@ class Algorithm:
 		return partitions
 
 	# a function here is just a dictionary that maps its unique inputs values to output values
-	def all_functions_from_partition_to_range(self, partition, h):
+	def generate_all_functions_from_partition_to_range(self, partition, h):
 		all_functions = set()
 		all_functions.add(Function({})) # initial set of undefined functions used to generate the rest
 
@@ -76,8 +81,8 @@ class Algorithm:
 				if codomain_value >= len(block.node_list):
 					# then for each function that already exists
 					for function in all_functions:
-						# create a new function with the only addition being
-						# where that block will be mapped to
+						# create a new function with the only difference being
+						# that the new block now has a mapping in that function
 
 						new_function = Function(dict(function.dictionary))
 						new_function.dictionary[block] = codomain_value
