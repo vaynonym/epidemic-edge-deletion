@@ -12,7 +12,7 @@ def test_generate_partitions_of_bag_of_size():
     algo = alg.Algorithm(nx.Graph())
     
     max_size = 8
-    bag = set([1,2,3,4,5,6,7, 8])
+    bag = set([1,2,3,4,5,6,7,8])
 
     # act
     result = algo.generate_partitions_of_bag_of_size(bag, max_size)

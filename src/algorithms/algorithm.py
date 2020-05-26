@@ -3,10 +3,47 @@ import copy
 class Algorithm:
 	
 	def __init__(self, nice_tree_decomposition):
-		self.nice_tree_decomposition = nice_tree_decomposition
+		#self.nice_tree_decomposition = nice_tree_decomposition
+		#self.nodes_to_be_calculated = nice_tree_decomposition.find_leafs()
+		#self.root = nice_tree_decomposition.root
+		#self.root_set = set(nice_tree_decomposition.root)
+		self.component_signatures = {}
 
 	def execute(self):
+
+		#nodes_to_be_calculated = nice_tree_decomposition.find_leafs()
+		#root_set = set(nice_tree_decomposition.root)
+
+		
+
+		#while(not nodes_to_be_calculated == root_set)
+		#	new_nodes_to_be_calculated = set(nodes_to_be_calculated)
+		#	for node in nodes_to_be_calculated:
+		#		if(self.can_node_be_calculated(node)):
+		#			self.component_signatures[node] = self.calculate_component_signature_of_node(node)
+		#			# update nodes_to_be_calculated
+		#			new_nodes_to_be_calculated.remove(node)
+		#			if(not node == root)
+		#				new_nodes_to_be_calculated.add(nice_tree_decomposition.graph.predecessor(node))
+		#	nodes_to_be_calculated = new_nodes_to_be_calculated
+		
 		return True
+
+	#def update_nodes_to_be_calculated(self, node, new_nodes_to_be_calculated):
+	#	new_nodes_to_be_calculated.remove(node)
+	#	if(not node == root)
+	#		new_nodes_to_be_calculated.add(nice_tree_decomposition.graph.predecessor(node))
+
+	#def can_node_be_calculated(self, node):
+	#	can_be_calculated = 0
+	#	successors = node.get_successor
+	#	for successor in successors:
+	#		if(successor in self.component_signatures):
+	#			can_be_calculated = can_be_calculated + 1
+	#	
+	#	return can_be_calculated == len(successors)
+			
+
 
 	def generate_possible_component_states_of_bag(self, bag, h):
 		states = set()
