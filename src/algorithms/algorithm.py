@@ -36,7 +36,7 @@ class Algorithm:
 
 	#def can_node_be_calculated(self, node):
 	#	can_be_calculated = 0
-	#	successors = node.get_successor
+	#	successors = node.get_successors
 	#	for successor in successors:
 	#		if(successor in self.component_signatures):
 	#			can_be_calculated = can_be_calculated + 1
