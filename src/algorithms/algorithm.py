@@ -71,6 +71,7 @@ class Algorithm:
 					if len(block) < size:
 						
 						new_partition = copy.deepcopy(partition)
+
 						# add node to block
 						for new_block in new_partition.blocks:
 							if new_block == block:
@@ -141,6 +142,9 @@ class Block:
 class Partition:
 	def __init__(self, blocks):
 		self.blocks = blocks
+
+	def __repr__(self):
+		return repr(self.blocks)
 
 class Function:
 	def __init__(self, dictionary):
