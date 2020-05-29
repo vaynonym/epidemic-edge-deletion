@@ -10,8 +10,6 @@ class Nice_Tree_Decomposition:
 
 class Nice_Tree_Node:
 
-	def __init__(self, node):
-		self.bag=set(node)
-	
-	def set_node_type(self, ntype):
-		self.node_type = ntype
+    def __init__(self, bag):
+        self.bag=set(bag)
+        self.node_type=""

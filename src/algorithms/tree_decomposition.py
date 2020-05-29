@@ -4,7 +4,6 @@ import random
 from networkx.algorithms import approximation
 import copy
 import matplotlib.pyplot as mpl
-#import src.algorithms.nice_tree_decomposition as ntd
 import src.algorithms.nice_tree_decomposition as ntd
 
 class Tree_Decomposer:
@@ -14,10 +13,9 @@ class Tree_Decomposer:
 		# TODO: replace with self.graph = graph and call function to compute TD
 		self.TD = nx.algorithms.approximation.treewidth.treewidth_min_degree(nx.fast_gnp_random_graph(20, 1/2, None, False))
 		self.graph = self.TD[1]
-		self.niceTD = nx.DiGraph()
 	
 	def make_nice_tree_decomposition(self):
-		# don't change order of these three function calls otherwise make_nice_Tree_nodes won't work proberly
+
 		self.choose_root()
 		self.make_directed()
 		self.make_nice_tree_nodes()
@@ -30,21 +28,25 @@ class Tree_Decomposer:
 			# if the node is a leaf then nothing has to be done
 			if len(list(self.graph.successors(node))) == 0:
 				continue
-			# these three function calls will construct the niceTD structur from a parent to each children
+			# these three function calls will construct the nice td structur from a parent to each children
 			self.create_introduce_nodes(node)
 			# if parent has only one child insert missing vertices (forget nodes between child and parent)
 			if len(list(self.graph.successors(node))) == 1:
-				# if forget node property already fullfilled no need to call create_forget_nodes
-				if not len(node.bag) + 1 == len(list(self.graph.successors(node))[0].bag):
-					self.create_forget_nodes(node)
-			# technically this if statement should not be neccessary i just put it there in desperation
-			if len(list(self.graph.successors(node))) >= 2:
+				# simple check if node already an introduce node
+				if len(node.bag) + 1 == len(list(self.graph.successors(node))[0].bag) and list(self.graph.successors(node))[0].bag.issubset(node.bag) :
+					continue
+				# simple check if node is already a forget node
+				if len(node.bag) == len(list(self.graph.successors(node))[0].bag)+1 and node.bag.issubset(list(self.graph.successors(node))[0].bag) :
+					continue
+				self.create_forget_nodes(node)
+			# technically, this if statement should not be neccessary i just put it there in desperation
+			if len(list(self.graph.successors(node))) >= 2 and node.node_type != "join":
 				self.create_join_node(node)
 
 			queue.extend(list(self.graph.successors(node)))
-		return self.niceTD
+
+		return self.graph
 	
-	# chooses root of niceTD and adds it to niceTD
 	def choose_root(self):
     	# for now chosen randomly
 		# list(graph) returns a list of the nodes (random.choice needs iterable object)
@@ -53,6 +55,7 @@ class Tree_Decomposer:
 	# when a node in the TD contains a vertex in its bag that none of its neighbours' bags contain then create introduce nodes until this is not true anymore
 	def create_introduce_nodes(self, node):
 		last_node=node
+		children_of_node = list(self.graph.successors(node))
 		union_of_children = set()
 		for child in set(self.graph.successors(node)):
 			union_of_children = union_of_children.union(child.bag)
@@ -66,44 +69,43 @@ class Tree_Decomposer:
 			node_without_children = list(node_without_children)
 			while len(node_without_children)>0:
 				vertex = node_without_children.pop(0)
-				temp = last_node.bag
+				temp = new_parent.bag
 				temp.remove(vertex)
 				last_node = ntd.Nice_Tree_Node(temp)
-				self.niceTD.add_edge(new_parent, last_node)
+				self.graph.add_edge(new_parent, last_node)
 				new_parent=last_node
 
-		# add new parent node to self.graph otherwise queue in make_nice_tree_decomposition won't work properly
+		# if new parents were added update edges of children
 		if last_node != node:
-			if len(list(self.graph.successors(node))) >= 1:
-				for child in list(self.graph.successors(node)):
+			if len(children_of_node) >= 1:
+				for child in children_of_node:
 					self.graph.add_edge(new_parent, child)
 					self.graph.remove_edge(node, child)
-				self.graph.add_edge(node, new_parent)
 		return node
 
-	# TODO: cut out some lines because this function will only be called if node hast exactly one child -> superfluous code
+	# is only called if parent is subset of child
 	# when a node in the TD does not contain a vertex that is in the intersection of the childrens' bags then create forget nodes until this is not true anymore
 	def create_forget_nodes(self, node):
+		child = list(self.graph.successors(node))[0]
+		child_without_parent = child.bag.difference(child.bag.intersection(node.bag))
 		last_node=node
-		intersection_of_children = random.choice(list(self.graph.successors(node))).bag
-		for child in set(self.graph.successors(node)):
-			intersection_of_children = intersection_of_children.intersection(child.bag)
-		if not set() == intersection_of_children:
-			for vertex in intersection_of_children:
-				temp = last_node.bag
+		self.graph.remove_edge(node, child)
+		if not set() == child_without_parent:
+			for vertex in child_without_parent:
+				parent=last_node
+				temp = set(parent.bag)
 				temp.add(vertex)
 				last_node = ntd.Nice_Tree_Node(temp)
-				self.niceTD.add_edge(node, last_node)
-				node=last_node
+				self.graph.add_edge(parent, last_node)
+			self.graph.remove_node(last_node)
+			self.graph.add_edge(parent, child)
 		return node
 
-	# when a node in the TD is subset of the union of the children then we need to create a join node and build to subtrees
+
 	def create_join_node(self, node):
-		# TODO: this does not work probably because deepcopires still have the same hash
+
 		left_node = ntd.Nice_Tree_Node(node.bag)
 		right_node = ntd.Nice_Tree_Node(node.bag)
-		self.niceTD.add_edge(node, left_node)
-		self.niceTD.add_edge(node, right_node)
 
     	# computes how to separate the children
 		best_partition = []
@@ -131,10 +133,10 @@ class Tree_Decomposer:
 		for right_child in best_partition[1]:
 			self.graph.add_edge(right_node, right_child)
 			self.graph.remove_edge(node, right_child)
-
+		node.node_type="join"
 		return [left_node, right_node]
 
-	# returns list of partitions with 2 blocks as [partition] where partition is a list of 2 sets
+	# returns list of partitions with 2 blocks as [partition] where partition is a list of 2 lists
 	def generate_partitions_with_2_blocks(self, arg_set , nonempty=True):
 		if len(arg_set)==0:
 			return
@@ -164,7 +166,7 @@ class Tree_Decomposer:
 					list_of_partitions.remove(partition)
 		return list_of_partitions
 
-	# takes a partition and evalutes the number of introduce
+	# takes a partition and evalutes the number of introduce node saved
 	def evaluate_partition(self, node, partition):
 		# computes the number of introduce nodes one can save using this partition
 		union_of_children_left = set()
@@ -190,7 +192,7 @@ class Tree_Decomposer:
 
 		return (introduce_nodes_saved, len(intersection_of_children_left)+len(intersection_of_children_right))
 
-	# transforms an undirected TD to a directed TD where only parents have an edge to its child(ren)
+	# transforms an undirected TD to a directed TD where only parents have an edge to its(their) child(ren)
 	def make_directed(self):
 		self.graph = self.graph.to_directed()
 		queue = [self.graph_root]
@@ -201,7 +203,7 @@ class Tree_Decomposer:
 			queue.pop(0)
 			queue = queue + list(self.graph.successors(parent))
 
-	# transform every node of self.graph into a Nice_Tree_Node and updates self.graph_root
+	# transforms every node of self.graph into a Nice_Tree_Node and updates self.graph_root
 	def make_nice_tree_nodes(self):
 		graph = nx.DiGraph()
 		node_pair_dict = {}
@@ -213,15 +215,3 @@ class Tree_Decomposer:
 				graph.add_edge(node_pair_dict[edge[0]],node_pair_dict[edge[1]])
 		self.graph = graph
 		self.graph_root = node_pair_dict[self.graph_root]
-		self.niceTD.add_node(self.graph_root)
-
-
-treed = Tree_Decomposer(nx.Graph())
-a=ntd.Nice_Tree_Node({1,2,3})
-b=ntd.Nice_Tree_Node({1,4,3})
-c=ntd.Nice_Tree_Node({6,2,3})
-d=ntd.Nice_Tree_Node({1,2,7})
-
-treed.make_nice_tree_decomposition()
-nx.draw(treed.niceTD)
-mpl.show()
