@@ -3,7 +3,7 @@ import numpy as np
 import src.preprocessing.preprocessor as prepro
 import src.algorithms.tree_decomposition as td
 import src.algorithms.algorithm as algo
-
+import src.algorithms.nice_tree_decomposition as ntd
 
 def main():
 
