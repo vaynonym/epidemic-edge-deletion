@@ -11,13 +11,14 @@ def test_generate_partitions_of_bag_of_size():
     #assemble
     algo = alg.Algorithm(nx.Graph())
     
-    max_size = 8
-    bag = set([1,2,3,4,5,6,7,8])
+    max_size = 5
+    bag = set([1,2,3,4,5,6,7])
 
     # act
     result = algo.generate_partitions_of_bag_of_size(bag, max_size)
 
     # assert
+    assert len(result) > 0
     for partition1 in result:
         for block1 in partition1.blocks:
             assert len(block1) > 0, "A block should be nonempty" 
