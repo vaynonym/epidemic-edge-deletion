@@ -67,8 +67,8 @@ class Algorithm:
 			new_partitions = set()
 			
 			for partition in partitions:
-				# iterate over each block, using a for loop because we need the index
-				# for the blocks in the new partition we create
+				# iterate over each block, using a for loop over an index because
+				# we need the index for the blocks in the new partition we create
 				for i in range(len(partition.blocks)):
 					if len(partition.blocks[i]) < size:
 						
