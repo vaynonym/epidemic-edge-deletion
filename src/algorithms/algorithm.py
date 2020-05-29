@@ -84,7 +84,7 @@ class Algorithm:
 								if not block in new_partition.blocks:
 									is_a_block_different = True
 									break
-							if not block_is_different:
+							if not is_a_block_different:
 								does_identical_partition_exist = True
 
 						if(not does_identical_partition_exist):
