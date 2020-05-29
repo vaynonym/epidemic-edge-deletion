@@ -67,22 +67,27 @@ class Algorithm:
 			new_partitions = set()
 			
 			for partition in partitions:
-				for block in partition.blocks:
-					if len(block) < size:
+				# iterate over each block, using a for loop because we need the index
+				# for the blocks in the new partition we create
+				for i in range(len(partition.blocks)):
+					if len(partition.blocks[i]) < size:
 						
-						new_partition = copy.deepcopy(partition)
+						new_partition = partition.get_copy()
+						
+						new_partition.blocks[i].append(node)
 
-						# add node to block
-						for new_block in new_partition.blocks:
-							if new_block == block:
-								new_block.append(node)
-								break
-
-						add_new_entry = True
+						# check if identical partition already exists
+						does_identical_partition_exist = False
 						for existing_partition in new_partitions:
-							if existing_partition.blocks == new_partition.blocks:
-								add_new_entry = False
-						if(add_new_entry):
+							is_a_block_different = False
+							for block in existing_partition.blocks:
+								if not block in new_partition.blocks:
+									is_a_block_different = True
+									break
+							if not block_is_different:
+								does_identical_partition_exist = True
+
+						if(not does_identical_partition_exist):
 							new_partitions.add(new_partition)
 			
 			partitions = new_partitions
@@ -145,6 +150,12 @@ class Partition:
 
 	def __repr__(self):
 		return repr(self.blocks)
+
+	def get_copy(self):
+		new_block_list = []
+		for block in self.blocks:
+			new_block_list.append(list(block))
+		return Partition(new_block_list)
 
 class Function:
 	def __init__(self, dictionary):
