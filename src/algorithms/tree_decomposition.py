@@ -4,7 +4,8 @@ import random
 from networkx.algorithms import approximation
 import copy
 import matplotlib.pyplot as mpl
-import src.algorithms.nice_tree_decomposition as ntd
+#import src.algorithms.nice_tree_decomposition as ntd
+import nice_tree_decomposition as ntd
 
 class Tree_Decomposer:
 	
@@ -19,10 +20,17 @@ class Tree_Decomposer:
 		self.choose_root()
 		self.make_directed()
 		self.make_nice_tree_nodes()
-
+		nodes_seen = []
 		queue = [self.graph_root]
 		while len(queue)>0:
+
 			node = queue.pop(0)
+			nodes_seen.extend([node])
+			#queue.extend(list(self.graph.successors(node)))
+			for child in list(self.graph.successors(node)):
+				if not child in nodes_seen:
+					queue.extend([child])
+
 			# TODO: special case bag of child equals bag of parent ?
 			
 			# if the node is a leaf then nothing has to be done
@@ -33,18 +41,16 @@ class Tree_Decomposer:
 			# if parent has only one child insert missing vertices (forget nodes between child and parent)
 			if len(list(self.graph.successors(node))) == 1:
 				# simple check if node already an introduce node
-				if len(node.bag) + 1 == len(list(self.graph.successors(node))[0].bag) and list(self.graph.successors(node))[0].bag.issubset(node.bag) :
+				if len(node.bag) == len(list(self.graph.successors(node))[0].bag) + 1 and list(self.graph.successors(node))[0].bag.issubset(node.bag) :
 					continue
 				# simple check if node is already a forget node
-				if len(node.bag) == len(list(self.graph.successors(node))[0].bag)+1 and node.bag.issubset(list(self.graph.successors(node))[0].bag) :
+				if len(node.bag) + 1 == len(list(self.graph.successors(node))[0].bag) and node.bag.issubset(list(self.graph.successors(node))[0].bag) :
 					continue
 				self.create_forget_nodes(node)
 			# technically, this if statement should not be neccessary i just put it there in desperation
 			if len(list(self.graph.successors(node))) >= 2 and node.node_type != "join":
 				self.create_join_node(node)
-
-			queue.extend(list(self.graph.successors(node)))
-
+		print(np.array(nodes_seen) == np.array(list(self.graph.nodes)))
 		return self.graph
 	
 	def choose_root(self):
@@ -60,7 +66,7 @@ class Tree_Decomposer:
 		for child in set(self.graph.successors(node)):
 			union_of_children = union_of_children.union(child.bag)
 		
-		node_without_children = node.bag
+		node_without_children = set(node.bag)
 		for elem in node.bag.intersection(union_of_children):
 			node_without_children.discard(elem)
 
@@ -69,7 +75,7 @@ class Tree_Decomposer:
 			node_without_children = list(node_without_children)
 			while len(node_without_children)>0:
 				vertex = node_without_children.pop(0)
-				temp = new_parent.bag
+				temp = set(new_parent.bag)
 				temp.remove(vertex)
 				last_node = ntd.Nice_Tree_Node(temp)
 				self.graph.add_edge(new_parent, last_node)
@@ -89,7 +95,6 @@ class Tree_Decomposer:
 		child = list(self.graph.successors(node))[0]
 		child_without_parent = child.bag.difference(child.bag.intersection(node.bag))
 		last_node=node
-		self.graph.remove_edge(node, child)
 		if not set() == child_without_parent:
 			for vertex in child_without_parent:
 				parent=last_node
@@ -97,15 +102,17 @@ class Tree_Decomposer:
 				temp.add(vertex)
 				last_node = ntd.Nice_Tree_Node(temp)
 				self.graph.add_edge(parent, last_node)
+
 			self.graph.remove_node(last_node)
 			self.graph.add_edge(parent, child)
+			self.graph.remove_edge(node, child)
 		return node
 
 
 	def create_join_node(self, node):
 
-		left_node = ntd.Nice_Tree_Node(node.bag)
-		right_node = ntd.Nice_Tree_Node(node.bag)
+		left_node = ntd.Nice_Tree_Node(set(node.bag))
+		right_node = ntd.Nice_Tree_Node(set(node.bag))
 
     	# computes how to separate the children
 		best_partition = []
@@ -197,11 +204,10 @@ class Tree_Decomposer:
 		self.graph = self.graph.to_directed()
 		queue = [self.graph_root]
 		while len(queue)>0:
-			parent = queue[0]
+			parent = queue.pop(0)
 			for child in list(self.graph.successors(parent)):
 					self.graph.remove_edge(child, parent)
-			queue.pop(0)
-			queue = queue + list(self.graph.successors(parent))
+			queue.extend(list(self.graph.successors(parent)))
 
 	# transforms every node of self.graph into a Nice_Tree_Node and updates self.graph_root
 	def make_nice_tree_nodes(self):
@@ -215,3 +221,29 @@ class Tree_Decomposer:
 				graph.add_edge(node_pair_dict[edge[0]],node_pair_dict[edge[1]])
 		self.graph = graph
 		self.graph_root = node_pair_dict[self.graph_root]
+
+	#TODO: add function to set node_type
+
+	def check_nice_tree_node_properties(self):
+		for node in list(self.graph.nodes):
+			if len(list(self.graph.successors(node)))>2:
+				return False
+			if len(list(self.graph.successors(node)))==2:
+				if not set(list(self.graph.successors(node))[0].bag) == set(node.bag):
+					return False
+				if not set(list(self.graph.successors(node))[1].bag) == set(node.bag):
+					return False
+			if len(list(self.graph.successors(node)))==1:
+				if not (len(node.bag) + 1 == len(list(self.graph.successors(node))[0].bag) and list(self.graph.successors(node))[0].bag.issubset(node.bag)
+					or len(node.bag) == len(list(self.graph.successors(node))[0].bag) +1 and node.bag.issubset(list(self.graph.successors(node))[0].bag)):
+					return False
+			if not (len(list(self.graph.successors(node)))==0 and len(list(self.graph.predecessors(node)))==1):
+				return False
+		return True
+
+treed = Tree_Decomposer(nx.Graph())
+nx.draw(treed.TD[1])
+mpl.show()
+nx.draw(treed.make_nice_tree_decomposition())
+mpl.show()
+print(treed.check_nice_tree_node_properties())

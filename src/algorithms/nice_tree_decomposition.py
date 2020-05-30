@@ -12,4 +12,5 @@ class Nice_Tree_Node:
 
     def __init__(self, bag):
         self.bag=set(bag)
+        #TODO: fix node_type to macros or something more pratical
         self.node_type=""
