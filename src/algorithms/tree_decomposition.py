@@ -4,8 +4,7 @@ import random
 from networkx.algorithms import approximation
 import copy
 import matplotlib.pyplot as mpl
-#import src.algorithms.nice_tree_decomposition as ntd
-import nice_tree_decomposition as ntd
+import src.algorithms.nice_tree_decomposition as ntd
 
 class Tree_Decomposer:
 	
@@ -50,7 +49,6 @@ class Tree_Decomposer:
 			# technically, this if statement should not be neccessary i just put it there in desperation
 			if len(list(self.graph.successors(node))) >= 2 and node.node_type != "join":
 				self.create_join_node(node)
-		print(np.array(nodes_seen) == np.array(list(self.graph.nodes)))
 		return self.graph
 	
 	def choose_root(self):
@@ -240,10 +238,3 @@ class Tree_Decomposer:
 			if not (len(list(self.graph.successors(node)))==0 and len(list(self.graph.predecessors(node)))==1):
 				return False
 		return True
-
-treed = Tree_Decomposer(nx.Graph())
-nx.draw(treed.TD[1])
-mpl.show()
-nx.draw(treed.make_nice_tree_decomposition())
-mpl.show()
-print(treed.check_nice_tree_node_properties())
