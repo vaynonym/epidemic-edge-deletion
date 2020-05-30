@@ -26,14 +26,13 @@ class Tree_Decomposer:
 			node = queue.pop(0)
 			nodes_seen.extend([node])
 			#queue.extend(list(self.graph.successors(node)))
-			for child in list(self.graph.successors(node)):
-				if not child in nodes_seen:
-					queue.extend([child])
-
 			# TODO: special case bag of child equals bag of parent ?
 			
 			# if the node is a leaf then nothing has to be done
 			if len(list(self.graph.successors(node))) == 0:
+				for child in list(self.graph.successors(node)):
+						if not child in nodes_seen:
+							queue.extend([child])
 				continue
 			# these three function calls will construct the nice td structur from a parent to each children
 			self.create_introduce_nodes(node)
@@ -41,14 +40,24 @@ class Tree_Decomposer:
 			if len(list(self.graph.successors(node))) == 1:
 				# simple check if node already an introduce node
 				if len(node.bag) == len(list(self.graph.successors(node))[0].bag) + 1 and list(self.graph.successors(node))[0].bag.issubset(node.bag) :
+					for child in list(self.graph.successors(node)):
+							if not child in nodes_seen:
+								queue.extend([child])
 					continue
 				# simple check if node is already a forget node
 				if len(node.bag) + 1 == len(list(self.graph.successors(node))[0].bag) and node.bag.issubset(list(self.graph.successors(node))[0].bag) :
+					for child in list(self.graph.successors(node)):
+						if not child in nodes_seen:
+							queue.extend([child])
 					continue
 				self.create_forget_nodes(node)
 			# technically, this if statement should not be neccessary i just put it there in desperation
 			if len(list(self.graph.successors(node))) >= 2 and node.node_type != "join":
 				self.create_join_node(node)
+
+			for child in list(self.graph.successors(node)):
+				if not child in nodes_seen:
+					queue.extend([child])
 		return self.graph
 	
 	def choose_root(self):
