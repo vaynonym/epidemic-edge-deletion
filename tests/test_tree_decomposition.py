@@ -35,9 +35,6 @@ def test_create_introduce_node():
 
     child = list(test_td.graph.successors(nodes_dict[frozenset(test_root)]))[0]
     assert (child.bag == {1,2,3,4} or child.bag == {1,2,3,5}), "child has not specified bag"
-    
-    child_child = list(test_td.graph.successors(child))[0]
-    assert child_child.bag == {1,2,3}, "child of child has not specified bag"
 
     for node_deg in list(nx.degree(test_td.graph)):
         assert not node_deg[1]==0, "does create isolated node(s)"
@@ -48,18 +45,16 @@ def test_create_introduce_node():
     #-----------------------------------------------------------------------------------------
     test_td.graph.remove_edge(test_td.graph_root, child)
 
-    test_td.graph.remove_edge(child, child_child)
-
-    test_td.graph.remove_edge(child_child, nodes_dict[frozenset({1,2})])
-    test_td.graph.remove_edge(child_child, nodes_dict[frozenset({3})])
-    test_td.graph.remove_edge(child_child, nodes_dict[frozenset({1,3})])
-    test_td.graph.remove_edge(child_child, nodes_dict[frozenset({2,3})])
+    test_td.graph.remove_edge(child, nodes_dict[frozenset({1,2})])
+    test_td.graph.remove_edge(child, nodes_dict[frozenset({3})])
+    test_td.graph.remove_edge(child, nodes_dict[frozenset({1,3})])
+    test_td.graph.remove_edge(child, nodes_dict[frozenset({2,3})])
 
     assert nx.is_empty(test_td.graph), "creates additional edge(s) or does not remove specified edge(s)"
 
     # test 2
     # checks if the function correctly creates no introduce nodes for
-    # 1 child and no vertex in parent that is neither of the children
+    # 1 child and no vertex in parent that is not in the child
     test_graph.clear()
     test_td.graph_root = nodes_dict[frozenset(test_root)]
     
@@ -79,6 +74,29 @@ def test_create_introduce_node():
     #-----------------------------------------------------------------------------------------
     test_graph.remove_edge(nodes_dict[frozenset(test_root)],nodes_dict[frozenset({1,2,3})])
     test_graph.remove_edge(nodes_dict[frozenset(test_root)],nodes_dict[frozenset({4,5})])
+
+    assert nx.is_empty(test_td.graph), "creates additional edge(s) or does not remove specified edge(s)"
+
+    # test 3
+    # checks if the function correctly creates introduce nodes for
+    # 1 child and 1+ vertex in parent that is not in the child
+
+    test_graph.clear()
+    test_graph.add_edge(nodes_dict[frozenset(test_root)],nodes_dict[frozenset({1,2,3})])
+
+    test_td.graph = test_graph
+    
+    test_td.create_introduce_nodes(nodes_dict[frozenset(test_root)])
+    
+    for node_deg in list(nx.degree(test_td.graph)):
+        assert not node_deg[1]==0, "does create isolated node(s)"
+
+    assert nx.number_of_selfloops(test_td.graph) == 0, "creates self loop(s)"
+    assert nx.is_weakly_connected(test_td.graph), "not weakly connected"
+
+    #-----------------------------------------------------------------------------------------
+    test_td.graph.remove_edge(list(test_td.graph.successors(nodes_dict[frozenset(test_root)]))[0],nodes_dict[frozenset({1,2,3})])
+    test_td.graph.remove_edge(nodes_dict[frozenset(test_root)],list(test_td.graph.successors(nodes_dict[frozenset(test_root)]))[0])
 
     assert nx.is_empty(test_td.graph), "creates additional edge(s) or does not remove specified edge(s)"
 
