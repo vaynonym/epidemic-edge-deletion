@@ -33,6 +33,7 @@ class Tree_Decomposer:
 				for child in list(self.graph.successors(node)):
 						if not child in nodes_seen:
 							queue.extend([child])
+				node.node_type=node.LEAF
 				continue
 			# these three function calls will construct the nice td structur from a parent to each children
 			self.create_introduce_nodes(node)
@@ -52,7 +53,7 @@ class Tree_Decomposer:
 					continue
 				self.create_forget_nodes(node)
 			# technically, this if statement should not be neccessary i just put it there in desperation
-			if len(list(self.graph.successors(node))) >= 2 and node.node_type != "join":
+			if len(list(self.graph.successors(node))) >= 2 and node.node_type != node.JOIN:
 				self.create_join_node(node)
 
 			for child in list(self.graph.successors(node)):
@@ -86,6 +87,7 @@ class Tree_Decomposer:
 			for child in children_of_node:
 				self.graph.add_edge(new_parent, child)
 				self.graph.remove_edge(node, child)
+			node.node_type=node.INTRODUCE
 		return node
 
 	# when a node in the TD does not contain a vertex that is in the intersection of the children then create forget nodes until this is not true anymore
@@ -100,6 +102,7 @@ class Tree_Decomposer:
 				temp.add(vertex)
 				last_node = ntd.Nice_Tree_Node(temp)
 				self.graph.add_edge(parent, last_node)
+				parent.node_type = parent.FORGET
 
 			self.graph.remove_node(last_node)
 			self.graph.add_edge(parent, child)
@@ -139,7 +142,7 @@ class Tree_Decomposer:
 		for right_child in best_partition[1]:
 			self.graph.add_edge(right_node, right_child)
 			self.graph.remove_edge(node, right_child)
-		node.node_type="join"
+		node.node_type=node.JOIN
 		return [left_node, right_node]
 
 	# returns list of partitions with 2 blocks as [partition] where partition is a list of 2 lists (2 partition blocks)
@@ -228,15 +231,17 @@ class Tree_Decomposer:
 				return False
 			if len(list(self.graph.successors(node)))==2:
 				if not set(list(self.graph.successors(node))[0].bag) == set(node.bag):
-					return False
+					if node.node_type == node.JOIN:
+						return False
 				if not set(list(self.graph.successors(node))[1].bag) == set(node.bag):
-					return False
+					if node.node_type == node.JOIN:
+						return False
 			if len(list(self.graph.successors(node)))==1:
 				if not ((len(node.bag) == len(list(self.graph.successors(node))[0].bag) + 1 and list(self.graph.successors(node))[0].bag.issubset(node.bag))
 					or (len(node.bag) + 1 == len(list(self.graph.successors(node))[0].bag) and node.bag.issubset(list(self.graph.successors(node))[0].bag))):
-					return False
+					if node.node_type == node.INTRODUCE or node.node_type == node.FORGET:
+						return False
 			if len(list(self.graph.successors(node)))==0 and len(list(self.graph.predecessors(node)))==0:
-				return False
+				if node.node_type == node.LEAF:
+					return False
 		return True
-
-	#TODO: add function to set node_type
