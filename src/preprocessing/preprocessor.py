@@ -14,7 +14,8 @@ class Preprocessor:
 		file.close()
 		
 		district_list = [ DistrictPolygon(district)
-										 	for district in data_dump["features"]] 
+											for district in data_dump["features"]
+											if district.properties["type_2"] != "Water body"]
 		
 		district_graph = nx.Graph()
 
