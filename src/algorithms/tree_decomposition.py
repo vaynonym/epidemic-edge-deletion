@@ -11,8 +11,8 @@ class Tree_Decomposer:
 	def __init__(self, graph):
     	# generates random graph on 30 nodes and a heuristic creates a TD
 		# TODO: replace with self.graph = graph and call function to compute TD
-		self.TD = nx.algorithms.approximation.treewidth.treewidth_min_degree(nx.fast_gnp_random_graph(20, 1/2, None, False))
-		self.graph = self.TD[1]
+		self.graph = graph
+		self.TD = nx.algorithms.approximation.treewidth.treewidth_min_degree(graph)
 	
 	def make_nice_tree_decomposition(self):
 
@@ -203,10 +203,16 @@ class Tree_Decomposer:
 
 	# transforms an undirected TD to a directed TD where only parents have an edge to its(their) child(ren)
 	def make_directed(self):
-		self.graph = self.graph.to_directed()
+		self.graph = nx.DiGraph(self.graph)
 		queue = [self.graph_root]
+		handled_nodes = set()
 		while len(queue)>0:
 			parent = queue.pop(0)
+			if (parent in handled_nodes):
+				continue
+
+			handled_nodes.add(parent)
+
 			for child in list(self.graph.successors(parent)):
 					self.graph.remove_edge(child, parent)
 			queue.extend(list(self.graph.successors(parent)))
@@ -216,7 +222,7 @@ class Tree_Decomposer:
 		graph = nx.DiGraph()
 		node_pair_dict = {}
 		for node in list(self.graph.nodes):
-			gnode = ntd.Nice_Tree_Node(set(node))
+			gnode = ntd.Nice_Tree_Node(set([node]))
 			node_pair_dict[node] = gnode
 		for node in node_pair_dict:
 			for edge in list(self.graph.edges(node)):

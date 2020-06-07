@@ -1,6 +1,7 @@
 import networkx as nx
 import geojson
 import copy
+import functools
 
 
 class Preprocessor:
@@ -16,11 +17,12 @@ class Preprocessor:
 		district_list = [ DistrictPolygon(district)
 											for district in data_dump["features"]
 											if district.properties["type_2"] != "Water body"]
-		
+
 		district_graph = nx.Graph()
 
 		for district1 in district_list:
 			district_graph.add_node(district1)
+
 			for district2 in district_list:
 				if(not district1 == district2 and district1.do_bounding_boxes_intersect(district2)):
 					if(not district2 in district1.neighbours):
@@ -32,21 +34,16 @@ class Preprocessor:
 
 		return district_graph
 
-
 	def build_graph(district_list):
 		for district in district_list:
 			pass
-					
 
-
-	
-
-
+@functools.total_ordering
 class DistrictPolygon:
-
 	def __init__(self, district):
-				
+		self.id = int(district.properties["cca_2"], 10)
 		self.district_name = district.properties["name_2"]
+		# TOOD: County ???
 		self.county_name = district.properties["name_1"]
 		
 		self.polygon_coordinate = district.properties["geo_point_2d"]
@@ -56,7 +53,6 @@ class DistrictPolygon:
 		self.neighbours = []
 
 	def calculate_bounding_box(self):
-		
 		bounding_box = (copy.deepcopy(self.polygon_coordinate), copy.deepcopy(self.polygon_coordinate))
 
 		if self.geometry.type == "Polygon":
@@ -113,5 +109,16 @@ class DistrictPolygon:
 				return True
 		return False
 		
+	def __eq__(self, other):
+		if not isinstance(other, DistrictPolygon):
+			return False
+		return self.id == other.id
 
+	def __hash__(self):
+		return hash(self.id)
+		
+	def __lt__(self, other):
+		if not isinstance(other, DistrictPolygon):
+			return NotImplemented
+		return self.id < other.id
 
