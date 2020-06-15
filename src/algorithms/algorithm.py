@@ -145,35 +145,41 @@ class Algorithm:
 		del_values = dict()
 		all_states = self.generate_possible_component_states_of_bag(bag, self.h)
 		for state in all_states:
-			potential_del_value = set()
+			potential_edges_to_remove = set()
 			induced_subgraph = self.graph.subgraph(list(bag))
-			for (u,w) in induced_subgraph.edges:
-				block_containing_u = Block(set())
-				block_containing_w = Block(set())
-				for block in state[0].blocks:
-					if(u in block.node_list):
-						block_containing_u = block
-					if(w in block.node_list):
-						block_containing_w = block
-					
-					if(block_containing_u.node_list != set() and block_containing_w.node_list != set()):
-						break
-					
-				if(block_containing_u != block_containing_w):
-					potential_del_value.add((u,w))
+
+			potential_edges_to_remove.update(self.edges_connecting_blocks_in_partition(induced_subgraph.edges, state))
 			
 			# for now I'm saving the del-values themselves because we'll probably need them
 			# for the algorithm as suggested by the paper, the second value of the tuple is what we need
-			if(len(potential_del_value) <= self.k):
-				del_values[(leaf_node, state)] = (potential_del_value, len(potential_del_value))
+			if(len(potential_edges_to_remove) <= self.k):
+				del_values[(leaf_node, state)] = (potential_edges_to_remove, len(potential_edges_to_remove))
 			else:
 				# in this case, there should be no need to save the actual set of edges
 				# so I'm leaving it as an empty set for performance reasons
 				del_values[(leaf_node, state)] = (set(), math.inf)
 		
 		return del_values
-				
 
+	# takes the edges of the induced subgraph and the current state
+	# returns set of edges
+	def	edges_connecting_blocks_in_partition(self, induced_subgraph_edges, state):
+		result = set()
+		for (u,w) in induced_subgraph_edges:
+			block_containing_u = Block(set())
+			block_containing_w = Block(set())
+			for block in state[0].blocks:
+				if(u in block.node_list):
+					block_containing_u = block
+				if(w in block.node_list):
+					block_containing_w = block
+				
+				if(block_containing_u.node_list != set() and block_containing_w.node_list != set()):
+					break
+				
+			if(block_containing_u != block_containing_w):
+				result.add((u,w))
+		return result
 				
 
 			
