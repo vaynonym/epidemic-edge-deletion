@@ -1,7 +1,9 @@
 import networkx as nx
 import geojson
 import copy
+import functools
 
+import matplotlib.pyplot as plt
 
 class Preprocessor:
 
@@ -14,39 +16,58 @@ class Preprocessor:
 		file.close()
 		
 		district_list = [ DistrictPolygon(district)
-										 	for district in data_dump["features"]] 
-		
+											for district in data_dump["features"]
+											if district.properties["type_2"] != "Water body"]
+
 		district_graph = nx.Graph()
 
+		name_dictionary = {}
+		position_dictionary = {}
 		for district1 in district_list:
-			district_graph.add_node(district1)
-			for district2 in district_list:
-				if(not district1 == district2 and district1.do_bounding_boxes_intersect(district2)):
-					if(not district2 in district1.neighbours):
-						district1.neighbours.append(district2)	
-					if(not district1 in district2.neighbours):
-						district2.neighbours.append(district1)
-					
-					district_graph.add_edge(district1, district2)
+				district_graph.add_node(district1)
+				name_dictionary[district1] = district1.district_name
+				position_dictionary[district1] = district1.polygon_coordinate
+				for district2 in district_list:
+						if(not district1 == district2 and district1.do_bounding_boxes_intersect(district2)):
+								if(not district2 in district1.neighbours):
+										district1.neighbours.append(district2)    
+								if(not district1 in district2.neighbours):
+										district2.neighbours.append(district1)
+								
+								district_graph.add_edge(district1, district2)
+
+		maxvalue=[0,0]
+		for key in position_dictionary:
+				position = position_dictionary[key]
+				if position[0] > maxvalue[0]:
+						maxvalue[0] = position[0]
+				if position[1] > maxvalue[1]:
+						maxvalue[1] = position[1]
+
+		for key in position_dictionary:
+				position = position_dictionary[key]
+				position[0] = position[0]/maxvalue[0]
+				position[1] = position[1]/maxvalue[1]
+
+		plt.figure(num=None, figsize=(15, 15), dpi=256)
+		
+		nx.draw_networkx_labels(district_graph,pos=position_dictionary, labels=name_dictionary,font_size=10)
+		nx.draw_networkx_nodes(district_graph,position_dictionary)
+		nx.draw_networkx_edges(district_graph, position_dictionary)
+		plt.savefig('output/districts.png')
 
 		return district_graph
-
 
 	def build_graph(district_list):
 		for district in district_list:
 			pass
-					
 
-
-	
-
-
+@functools.total_ordering
 class DistrictPolygon:
-
 	def __init__(self, district):
-				
+		self.id = int(district.properties["cca_2"], 10)
 		self.district_name = district.properties["name_2"]
-		self.county_name = district.properties["name_1"]
+		self.state_name = district.properties["name_1"]
 		
 		self.polygon_coordinate = district.properties["geo_point_2d"]
 		self.polygon_coordinate.reverse() # for some reason the coordinates here seem reversed from all the others...?
@@ -55,7 +76,6 @@ class DistrictPolygon:
 		self.neighbours = []
 
 	def calculate_bounding_box(self):
-		
 		bounding_box = (copy.deepcopy(self.polygon_coordinate), copy.deepcopy(self.polygon_coordinate))
 
 		if self.geometry.type == "Polygon":
@@ -112,5 +132,16 @@ class DistrictPolygon:
 				return True
 		return False
 		
+	def __eq__(self, other):
+		if not isinstance(other, DistrictPolygon):
+			return False
+		return self.id == other.id
 
+	def __hash__(self):
+		return hash(self.id)
+		
+	def __lt__(self, other):
+		if not isinstance(other, DistrictPolygon):
+			return NotImplemented
+		return self.id < other.id
 
