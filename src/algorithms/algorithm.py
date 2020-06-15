@@ -1,13 +1,17 @@
 import copy
+import math
 
 class Algorithm:
 	
-	def __init__(self, nice_tree_decomposition):
+	def __init__(self, graph, nice_tree_decomposition, h, k):
+		self.graph = graph
+		self.h = h
+		self.k = k
 		#self.nice_tree_decomposition = nice_tree_decomposition
 		#self.nodes_to_be_calculated = nice_tree_decomposition.find_leafs()
 		#self.root = nice_tree_decomposition.root
 		#self.root_set = set(nice_tree_decomposition.root)
-		self.component_signatures = {}
+
 
 	def execute(self):
 
@@ -50,7 +54,7 @@ class Algorithm:
 		all_partitions = self.generate_partitions_of_bag_of_size(bag, h)
 		for partition in all_partitions:
 			all_functions = self.generate_all_functions_from_partition_to_range(partition, h)
-			for function in all_function:
+			for function in all_functions:
 				states.add( (partition, function))
 
 		return states
@@ -113,7 +117,7 @@ class Algorithm:
 		for block in partition.blocks:
 			new_block_list.append(Block(block)) # blocks need to be hashable now so we create a wrapper object
 		partition.blocks = new_block_list
-		print(partition.blocks)
+	
 		
 		# partially define function by setting the mapping for each block
 		for block in partition.blocks:
@@ -133,9 +137,45 @@ class Algorithm:
 						new_all_functions.append(new_function)
 			
 			all_functions = new_all_functions
-		for function in all_functions:
-			print(function.dictionary)
+
 		return all_functions
+
+	# Algorithm 2
+	def find_component_signatures_of_leaf_nodes(self, leaf_node, bag):
+		del_values = dict()
+		all_states = self.generate_possible_component_states_of_bag(bag, self.h)
+		for state in all_states:
+			potential_del_value = set()
+			induced_subgraph = self.graph.subgraph(list(bag))
+			for (u,w) in induced_subgraph.edges:
+				block_containing_u = Block(set())
+				block_containing_w = Block(set())
+				for block in state[0].blocks:
+					if(u in block.node_list):
+						block_containing_u = block
+					if(w in block.node_list):
+						block_containing_w = block
+					
+					if(block_containing_u.node_list != set() and block_containing_w.node_list != set()):
+						break
+					
+				if(block_containing_u != block_containing_w):
+					potential_del_value.add((u,w))
+			
+			# for now I'm saving the del-values themselves because we'll probably need them
+			# for the algorithm as suggested by the paper, the second value of the tuple is what we need
+			if(len(potential_del_value) <= self.k):
+				del_values[(leaf_node, state)] = (potential_del_value, len(potential_del_value))
+			else:
+				# in this case, there should be no need to save the actual set of edges
+				# so I'm leaving it as an empty set for performance reasons
+				del_values[(leaf_node, state)] = (set(), math.inf)
+		
+		return del_values
+				
+
+				
+
 			
 
 

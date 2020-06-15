@@ -37,7 +37,9 @@ def main():
 	print(" \\__________________________/")
 	print()
 
-	algorithm = algo.Algorithm(nice_tree_decomposition)
+	h = 3
+	k = 3
+	algorithm = algo.Algorithm(graph, nice_tree_decomposition, h, k)
 	result = algorithm.execute()	
 	
 	print("result:")

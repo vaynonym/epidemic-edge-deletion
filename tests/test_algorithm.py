@@ -1,15 +1,16 @@
 import src.algorithms.algorithm as alg
 import networkx as nx
+import src.algorithms.nice_tree_decomposition as ntd
 
 def test_algorithm():
-	algo = alg.Algorithm(nx.Graph())
+	algo = alg.Algorithm(nx.Graph(), nx.Graph(), 0, 0)
 
 
 
 def test_generate_partitions_of_bag_of_size():
 
     #assemble
-    algo = alg.Algorithm(nx.Graph())
+    algo = alg.Algorithm(nx.Graph(), nx.Graph(), 0, 0)
     
     max_size = 5
     bag = set([1,2,3,4,5,6,7])
@@ -37,11 +38,11 @@ def test_generate_partitions_of_bag_of_size():
             
 def test_generate_all_functions_of_partition():
     # assemble
-    algo = alg.Algorithm(nx.Graph())
+    max_size = 7
+    algo = alg.Algorithm(nx.Graph(), nx.Graph(), max_size, 0)
 
 
     partition = alg.Partition([[1,2,6,4,5], [6,10,3], [9,7,11,12], [13,14,15,16]])
-    max_size = 7
     # act
     result = algo.generate_all_functions_from_partition_to_range(partition, max_size)
 
@@ -60,6 +61,38 @@ def test_generate_all_functions_of_partition():
                         functions_are_unique = True
                 assert functions_are_unique, "Functions should be unique"
     
+def test_find_component_signatures_of_leaf_nodes():
+    nodes = [1, 2, 3, 4, 5, 6]
+    graph = nx.Graph()
+    graph.add_nodes_from(nodes)
+    graph.add_edges_from(
+        [[node1, node2] for node2 in nodes for node1 in nodes if not node1 == node2]
+    )
+    h = 3
+    k = 3
+    print(graph.nodes)
+    print(graph.edges)
+    algo = alg.Algorithm(graph, nx.Graph(), h, k)
+    
+    bag = ntd.Nice_Tree_Node([2, 3, 4, 5])
+
+    result = algo.find_component_signatures_of_leaf_nodes(bag, bag.bag)
+
+    for key, del_value in result.items():
+        print(del_value)
+
+    # assert False
+
+
+
+
+
+
+
+
+    
+
+
 
     
     
