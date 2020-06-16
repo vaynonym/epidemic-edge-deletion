@@ -191,6 +191,9 @@ class Block:
 	def __init__(self, node_list):
 		self.node_list = node_list
 
+	def __getitem__(self, key):
+		return self.node_list[key]
+
 class Partition:
 	def __init__(self, blocks):
 		self.blocks = blocks
@@ -204,9 +207,15 @@ class Partition:
 			new_block_list.append(list(block))
 		return Partition(new_block_list)
 
+	def __getitem__(self, key):
+		return self.blocks[key]
+
 class Function:
 	def __init__(self, dictionary):
 		self.dictionary = dictionary
+
+	def __getitem__(self, key):
+		return self.dictionary[i]
 
 
 
