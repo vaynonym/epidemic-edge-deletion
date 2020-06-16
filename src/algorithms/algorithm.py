@@ -215,7 +215,7 @@ class Function:
 		self.dictionary = dictionary
 
 	def __getitem__(self, key):
-		return self.dictionary[i]
+		return self.dictionary[key]
 
 
 
