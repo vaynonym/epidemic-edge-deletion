@@ -84,14 +84,50 @@ def test_find_component_signatures_of_leaf_nodes():
     # assert False
 
 
+def test_algorithm3_function_generator():
 
+    algo = alg.Algorithm(0,0,0,0)
+    h = 10
+    dictionary = dict()
+    partition = alg.Partition([])
+    for x in range(1,11):
+        block = alg.Block([x])
+        partition.blocks.append(block)
+        dictionary[block] = x
 
+    last_block = alg.Block([11,12,13,14])
+    dictionary[last_block]=8
+    parent_function = alg.Function(dictionary)
 
+    last_block.node_list.pop(len(last_block.node_list)-1)
+    refinements = algo.generate_partitions_of_bag_of_size(last_block, len(last_block.node_list)-1)
+    refinement = list(refinements)[0]
+    print(refinement)
+    result = algo.algorithm3_function_generator(parent_function, partition, last_block, refinement , 0)
 
-
-
+    for function1 in result:
+        for block in partition.blocks:
+            if block == last_block:
+                assert block in function1.dictionary, "Every block needs to be assigned a value"    
+        for key1 in function1.dictionary:
+            assert function1.dictionary[key1] >= 1, "function(X) >= 1"
+            assert function1.dictionary[key1] <= h, "function(X) <= h"
+        for function2 in result:
+            if(not function1 == function2):
+                functions_are_unique = False
+                for key2 in function2.dictionary:
+                    if(not function1.dictionary[key2] == function2.dictionary[key2]):
+                        functions_are_unique = True
+                assert functions_are_unique, "Functions should be unique"
+        sum_of_refinement_blocks = 0
+        for block in function1.dictionary:
+            if block in partition:
+                assert  function1[block] == parent_function[block], "c'(X) = c(X) not fulfilled"
+            # if block not in partition then it is a block of a refinement
+            else:
+                sum_of_refinement_blocks += function1[block]
+        assert parent_function[last_block]-1 == sum_of_refinement_blocks, "c(X_r) != sum of refinement block values" 
     
-
 
 
     
