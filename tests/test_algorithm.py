@@ -16,6 +16,11 @@ def test_hashing():
 
 	assert d[sigma3] == 8
 
+def test_functions():
+	func = alg.Function({alg.Block([1]): 1, alg.Block([2]): 2, alg.Block([3]): 3, alg.Block([4]): 4, alg.Block([5]): 5, alg.Block([6]): 6, alg.Block([7]): 7, alg.Block([8]): 8, alg.Block([9]): 9, alg.Block([10]): 10, alg.Block([11, 12, 13]): 8})
+	key = alg.Block([11, 12, 13])
+	print(func[key])
+
 def test_generate_partitions_of_bag_of_size():
 
     #assemble
@@ -148,8 +153,7 @@ def test_algorithm3_function_generator():
     dictionary[last_block]=8
     parent_function = alg.Function(dictionary)
 
-    last_block.node_list.pop(len(last_block.node_list)-1)
-    refinements = algo.generate_partitions_of_bag_of_size(last_block, len(last_block.node_list)-1)
+    refinements = algo.generate_partitions_of_bag_of_size(alg.Block([11,12,13]), len(alg.Block([11,12,13]))-1)
     refinement = list(refinements)[0]
     print(refinement)
     result = algo.algorithm3_function_generator(parent_function, partition, last_block, refinement , 0)
