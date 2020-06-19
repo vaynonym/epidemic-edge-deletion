@@ -1,6 +1,7 @@
 import copy
 import math
 import src.algorithms.nice_tree_decomposition as ntd
+import threading
 
 class Algorithm:
 	
@@ -8,46 +9,92 @@ class Algorithm:
 		self.graph = graph
 		self.h = h
 		self.k = k
-		#self.nice_tree_decomposition = nice_tree_decomposition
-		#self.nodes_to_be_calculated = nice_tree_decomposition.find_leafs()
-		#self.root = nice_tree_decomposition.root
-		#self.root_set = set(nice_tree_decomposition.root)
+		self.nice_tree_decomposition = nice_tree_decomposition
+		self.nodes_to_be_calculated = self.nice_tree_decomposition.find_leafs()
+		self.root = nice_tree_decomposition.root
+		self.component_signatures = dict()
 
 
 	def execute(self):
 
-		#nodes_to_be_calculated = nice_tree_decomposition.find_leafs()
-		#root_set = set(nice_tree_decomposition.root)
-
-		
-
-		#while(not nodes_to_be_calculated == root_set)
-		#	new_nodes_to_be_calculated = set(nodes_to_be_calculated)
-		#	for node in nodes_to_be_calculated:
-		#		if(self.can_node_be_calculated(node)):
-		#			self.component_signatures[node] = self.calculate_component_signature_of_node(node)
-		#			# update nodes_to_be_calculated
-		#			new_nodes_to_be_calculated.remove(node)
-		#			if(not node == root)
-		#				new_nodes_to_be_calculated.add(nice_tree_decomposition.graph.predecessor(node))
-		#	nodes_to_be_calculated = new_nodes_to_be_calculated
-		
 		return True
 
-	#def update_nodes_to_be_calculated(self, node, new_nodes_to_be_calculated):
-	#	new_nodes_to_be_calculated.remove(node)
-	#	if(not node == root)
-	#		new_nodes_to_be_calculated.add(nice_tree_decomposition.graph.predecessor(node))
-
-	#def can_node_be_calculated(self, node):
-	#	can_be_calculated = 0
-	#	successors = node.get_successors
-	#	for successor in successors:
-	#		if(successor in self.component_signatures):
-	#			can_be_calculated = can_be_calculated + 1
-	#	
-	#	return can_be_calculated == len(successors)
+		nodes_to_be_calculated = self.nice_tree_decomposition.find_leafs()
+		component_signatures = dict()
+		number_of_removed_nodes = ThreadSafeCounter(0)
+		while(not nodes_to_be_calculated == set()):
+			print(len(nodes_to_be_calculated))
+			new_nodes_to_be_calculated = set(nodes_to_be_calculated)
 			
+			#calculation_threads = list()  # uncomment for multi-threading/ comment for single-threading
+			number_of_active_threads = ThreadSafeCounter(0)  
+			
+			thread_number = 0
+			for node in nodes_to_be_calculated:
+				if(self.can_node_be_calculated(node)):
+					thread_number += 1
+					
+					# uncomment this block for multithreading/ comment for single-threading
+					#calculation = threading.Thread(target=self.calculate_component_signature_of_node, args=(node, new_nodes_to_be_calculated,
+					#								number_of_removed_nodes, thread_number, number_of_active_threads))
+					#calculation_threads.append(calculation)
+					#calculation.start()
+
+					# comment for multithreading/ uncomment for single-threading 
+					self.calculate_component_signature_of_node(node, new_nodes_to_be_calculated, number_of_removed_nodes, thread_number, number_of_active_threads) 
+			for calculation in calculation_threads:
+				calculation.join()
+			nodes_to_be_calculated = new_nodes_to_be_calculated
+		
+		return component_signatures[self.root]
+
+
+	def can_node_be_calculated(self, node):
+		can_be_calculated = 0
+		successors = list(self.nice_tree_decomposition.successors(node))
+		for successor in successors:
+			if(successor in self.component_signatures.keys()):
+				can_be_calculated = can_be_calculated + 1
+		
+		return can_be_calculated == len(successors)
+
+	def calculate_component_signature_of_node(self, node, new_nodes_to_be_calculated, number_of_removed_nodes, thread_number, number_of_active_threads):
+		number_of_active_threads.increment()
+		if(node.node_type == ntd.Nice_Tree_Node.LEAF):
+			successors = list(self.nice_tree_decomposition.successors(node))
+			assert len(successors) == 0
+			self.component_signatures[node] = self.find_component_signatures_of_leaf_nodes(node, node.bag)
+		
+		elif(node.node_type == ntd.Nice_Tree_Node.INTRODUCE):
+			successors = list(self.nice_tree_decomposition.successors(node))
+			assert len(successors) == 1
+			child = successors[0]
+			self.component_signatures[node] = self.calculate_component_signature_of_introduce_node(node, node.bag, child, child.bag, component_signatures[child])
+
+		elif(node.node_type == ntd.Nice_Tree_Node.FORGET):
+			successors = list(self.nice_tree_decomposition.successors(node))
+			assert len(successors) == 1
+			child = successors[0]
+			self.component_signatures[node] = self.find_component_signatures_of_forget_node(node, child, component_signatures[child])
+
+		else: 
+			assert node.node_type == ntd.Nice_Tree_Node.JOIN
+			successors = list(self.nice_tree_decomposition.successors(node))
+			assert len(successors) == 2
+			child_1 = successors[0]
+			child_2 = successors[1]
+			del_values_child = dict(component_signatures[child_1]).update(component_signatures[child_2])
+			self.component_signatures[node] = self.find_component_signatures_of_join_nodes(node, node.bag, child_1, child_2, del_values_child)
+
+		new_nodes_to_be_calculated.update(self.nice_tree_decomposition.predecessors(node))
+		new_nodes_to_be_calculated.remove(node)
+		number_of_removed_nodes.increment()
+		number_of_active_threads.decrement()
+		print("""
+Thread {number} has finished its calculation
+Finished the calculation of the component signature of {removed} of {total} nodes
+There are now {active_threads} active threads"""
+			  .format(number=thread_number, removed = number_of_removed_nodes.counter, total = len(self.nice_tree_decomposition.graph.nodes), active_threads=number_of_active_threads.counter))
 
 
 	def generate_possible_component_states_of_bag(self, bag, h):
@@ -156,12 +203,12 @@ class Algorithm:
 		return del_values
 
 	# Algorithm 3
-	def calculate_component_signature_of_introduce_node(self, introduce_node, parent_bag, child, child_bag, del_Values_Child):
+	def calculate_component_signature_of_introduce_node(self, introduce_node, bag, child, child_bag, del_values_child):
 		del_Values = dict()
-		all_States = self.generate_possible_component_states_of_bag(parent_bag, self.h)
+		all_States = self.generate_possible_component_states_of_bag(bag, self.h)
 
 		# v is a set containing the node
-		v = parent_bag.symmetric_difference(child_bag)
+		v = bag.symmetric_difference(child_bag)
 		block_containing_v = set()
 
 		# find block containing v
@@ -180,14 +227,14 @@ class Algorithm:
 
 				for c_prime in all_Cs:
 					introduce_inhereted_cStates.add((partition_prime, c_prime))
-			
+
 			minValue = math.inf
 			minValue_edge_set = set()
 
 			for state_prime in introduce_inhereted_cStates:
 				# unsure whether state should be state_prime or not (paper says state)
 				edge_set = edges_connecting_blocks_in_partition(self.graph.subgraph(bag).edges , state)
-				value = del_Values_Child[(child, state_prime)] + len(edge_set)
+				value = del_values_child[(child, state_prime)] + len(edge_set)
 				if value < minValue:
 					minValue = value
 					minValue_edge_set = edge_set
@@ -197,6 +244,10 @@ class Algorithm:
 			else:
 				del_Values[(introduce_node, state)] = (set(), math.inf)
 		return del_Values
+
+	# Algorithm 4
+	def find_component_signatures_of_forget_node(self, node, child_node, del_values_child):
+		return dict()
 
 	# Algorithm 5
 	def find_component_signatures_of_join_nodes(self, join_node, bag, child_1, child_2, del_values_child):
@@ -405,3 +456,17 @@ class Function:
 
 	def __repr__(self):
 		return "Function(%r)" % self.dictionary
+
+class ThreadSafeCounter:
+	def __init__(self, counter_value):
+		self.counter = counter_value
+		self.lock = threading.Lock()
+
+	def increment(self):
+		with self.lock:
+			self.counter += 1
+
+	def decrement(self):
+		with self.lock:
+			self.counter -= 1
+

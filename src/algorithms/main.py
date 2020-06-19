@@ -41,9 +41,9 @@ def main():
 	print()
 	
 	tree_decomposer = td.Tree_Decomposer(graph)
-	nice_tree_decomposition = tree_decomposer.make_nice_tree_decomposition()
+	nice_tree_decomposition = ntd.Nice_Tree_Decomposition(tree_decomposer.make_nice_tree_decomposition())
 
-	print("NTD has %d nodes" % len(nice_tree_decomposition.nodes))
+	print("NTD has %d nodes" % len(nice_tree_decomposition.graph.nodes))
 	print("Nice properties: %r" % tree_decomposer.check_nice_tree_node_properties())
 
 	#print_graph(nice_tree_decomposition, 'output/ntd.png', False)
