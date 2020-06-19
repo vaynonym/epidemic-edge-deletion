@@ -3,4 +3,5 @@
 .tox/
 *.swp
 .vscode/
+output/
 

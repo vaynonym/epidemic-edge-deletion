@@ -155,6 +155,50 @@ class Algorithm:
 		
 		return del_values
 
+	# Algorithm 3
+	def calculate_component_signature_of_introduce_node(self, introduce_node, parent_bag, child, child_bag, del_Values_Child):
+		del_Values = dict()
+		all_States = self.generate_possible_component_states_of_bag(parent_bag, self.h)
+
+		# v is a set containing the node
+		v = parent_bag.symmetric_difference(child_bag)
+		block_containing_v = set()
+
+		# find block containing v
+		for block in state[0]:
+			if v.issubset(block):
+				block_containing_v = block
+
+		for state in all_States:
+			introduce_inhereted_cStates = set()
+			partition_without_block_containing_v = state[0].symmetric_difference(set(block_containing_v))
+			refinements = self.generate_partitions_of_bag_of_size(block_containing_v.symmetric_difference(v), len(block_containing_v.symmetric_difference(v)))
+
+			for refinement in refinements:
+				partition_prime = partition_without_block_containing_v.union(refinement)
+				all_Cs = self.algorithm3_function_generator(state[1], partition_without_block_containing_v, block_containing_v, refinement, self.h)
+
+				for c_prime in all_Cs:
+					introduce_inhereted_cStates.add((partition_prime, c_prime))
+			
+			minValue = math.inf
+			minValue_edge_set = set()
+
+			for state_prime in introduce_inhereted_cStates:
+				# unsure whether state should be state_prime or not (paper says state)
+				edge_set = edges_connecting_blocks_in_partition(self.graph.subgraph(bag).edges , state)
+				value = del_Values_Child[(child, state_prime)] + len(edge_set)
+				if value < minValue:
+					minValue = value
+					minValue_edge_set = edge_set
+
+			if minValue <= k:
+				del_Values[(introduce_node, state)] = (minValue_edge_set, minValue)
+			else:
+				del_Values[(introduce_node, state)] = (set(), math.inf)
+		return del_Values
+
+	# Algorithm 5
 	def find_component_signatures_of_join_nodes(self, join_node, bag, child_1, child_2, del_values_child):
 		del_values = dict()
 		all_states = self.generate_possible_component_states_of_bag(bag, self.h)
