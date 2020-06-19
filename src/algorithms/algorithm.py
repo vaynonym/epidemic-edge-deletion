@@ -1,5 +1,6 @@
 import copy
 import math
+import src.algorithms.nice_tree_decomposition as ntd
 
 class Algorithm:
 	
@@ -63,7 +64,7 @@ class Algorithm:
 		partitions = set()
 		initial_partition = Partition([])
 		for node in bag:
-			initial_partition.blocks.append([])
+			initial_partition.blocks.append(Block([]))
 
 		partitions.add(initial_partition)
 
@@ -73,19 +74,19 @@ class Algorithm:
 			for partition in partitions:
 				# iterate over each block, using a for loop over an index because
 				# we need the index for the blocks in the new partition we create
-				for i in range(len(partition.blocks)):
-					if len(partition.blocks[i]) < size:
+				for i in range(len(partition)):
+					if len(partition[i]) < size:
 						
 						new_partition = partition.get_copy()
 						
-						new_partition.blocks[i].append(node)
+						new_partition[i].append(node)
 
 						# check if identical partition already exists
 						does_identical_partition_exist = False
 						for existing_partition in new_partitions:
 							is_a_block_different = False
 							for block in existing_partition.blocks:
-								if not block in new_partition.blocks:
+								if not block in new_partition:
 									is_a_block_different = True
 									break
 							if not is_a_block_different:
@@ -99,8 +100,8 @@ class Algorithm:
 
 		for partition in partitions:
 			blocks_to_remove = []
-			for block in partition.blocks:
-				if block == []:
+			for block in partition:
+				if block.node_list == [] :
 					blocks_to_remove.append(block)
 			
 			for block in blocks_to_remove:
@@ -113,12 +114,6 @@ class Algorithm:
 		all_functions = set()
 		all_functions.add(Function({})) # initial set of undefined functions used to generate the rest
 
-		new_block_list = []
-		for block in partition.blocks:
-			new_block_list.append(Block(block)) # blocks need to be hashable now so we create a wrapper object
-		partition.blocks = new_block_list
-	
-		
 		# partially define function by setting the mapping for each block
 		for block in partition.blocks:
 
@@ -144,31 +139,91 @@ class Algorithm:
 	def find_component_signatures_of_leaf_nodes(self, leaf_node, bag):
 		del_values = dict()
 		all_states = self.generate_possible_component_states_of_bag(bag, self.h)
-		for state in all_states:
+		for (P, c) in all_states:
 			potential_edges_to_remove = set()
-			induced_subgraph = self.graph.subgraph(list(bag))
 
-			potential_edges_to_remove.update(self.edges_connecting_blocks_in_partition(induced_subgraph.edges, state))
+			potential_edges_to_remove.update(self.edges_connecting_blocks_in_partition(bag, P))
 			
 			# for now I'm saving the del-values themselves because we'll probably need them
 			# for the algorithm as suggested by the paper, the second value of the tuple is what we need
 			if(len(potential_edges_to_remove) <= self.k):
-				del_values[(leaf_node, state)] = (potential_edges_to_remove, len(potential_edges_to_remove))
+				del_values[(leaf_node, (P, c))] = (potential_edges_to_remove, len(potential_edges_to_remove))
 			else:
 				# in this case, there should be no need to save the actual set of edges
 				# so I'm leaving it as an empty set for performance reasons
-				del_values[(leaf_node, state)] = (set(), math.inf)
+				del_values[(leaf_node, (P, c))] = (set(), math.inf)
 		
 		return del_values
 
+	def find_component_signatures_of_join_nodes(self, join_node, bag, child_1, child_2, del_values_child):
+		del_values = dict()
+		all_states = self.generate_possible_component_states_of_bag(bag, self.h)
+		for (P, c) in all_states:
+			sigma_t1_t2_join = set()
+			partition_1 = P
+			partition_2 = P
+			all_function_pairs = self.get_all_function_pairs(P, c)
+
+			for (c_1, c_2) in all_function_pairs:
+				sigma_t1_t2_join.add(((partition_1, c_1), (partition_2, c_2)))
+			
+			minValue = math.inf
+			minValueSet = set()
+			for (sigma_1, sigma_2) in sigma_t1_t2_join:
+				edges_connecting_blocks_in_partition = self.edges_connecting_blocks_in_partition(bag, P)
+				value = (del_values_child[(child_1, sigma_1)][1] + del_values_child[(child_2, sigma_2)][1] 
+						 - len(edges_connecting_blocks_in_partition))
+
+				if(value < minValue):
+					minValue = value
+					minValueSet = edges_connecting_blocks_in_partition
+
+			if(minValue <= self.k):
+				del_values[join_node, (P, c)] = (minValueSet, minValue)
+			else:
+				del_values[join_node, (P, c)] = (set(), math.inf)
+
+		return del_values
+				
+
+	def get_all_function_pairs(self, partition, c):
+		all_function_pairs = set()
+		all_function_pairs.add((Function(dict()), Function(dict()))) # initial set of undefined functions used to generate the rest
+	
+		# partially define function by setting the mapping for each block
+		for block in partition:
+
+			# for each possible value that a block could be mapped to
+			new_all_function_pairs = []
+			for c_1_codomain_value in range(1, self.h + 1):
+				# go over each possible combination of c1 and c2 values
+				for c_2_codomain_value in range(1, self.h + 1):
+					# if that pair of values is legal
+					if (c_1_codomain_value + c_2_codomain_value - len(block) == c[block]
+						and c_1_codomain_value >= len(block) and c_2_codomain_value >= len(block)):
+						# then for each function that already exists
+						for function_pair in all_function_pairs:
+							# create a new function with the only difference being
+							# that the new block now has a mapping in that function
+
+							new_function_pair = (Function(dict(function_pair[0].dictionary)), Function(dict(function_pair[1].dictionary)))
+							new_function_pair[0][block] = c_1_codomain_value
+							new_function_pair[1][block] = c_2_codomain_value
+							new_all_function_pairs.append(new_function_pair)
+			
+			all_function_pairs = new_all_function_pairs
+
+		return all_function_pairs
+
 	# takes the edges of the induced subgraph and the current state
 	# returns set of edges
-	def	edges_connecting_blocks_in_partition(self, induced_subgraph_edges, state):
+	def	edges_connecting_blocks_in_partition(self, bag, partition):
+		induced_subgraph_edges = self.graph.subgraph(list(bag)).edges
 		result = set()
 		for (u,w) in induced_subgraph_edges:
 			block_containing_u = Block(set())
 			block_containing_w = Block(set())
-			for block in state[0].blocks:
+			for block in partition:
 				if(u in block.node_list):
 					block_containing_u = block
 				if(w in block.node_list):
@@ -182,9 +237,6 @@ class Algorithm:
 		return result
 				
 
-			
-
-
 
 # We need a wrapper class in order to have hashable lists for the set of Partitions
 class Block:
@@ -194,21 +246,58 @@ class Block:
 	def __getitem__(self, key):
 		return self.node_list[key]
 
+	def __setitem__(self, key, value):
+		self.node_list[key] = value
+
+	def __len__(self):
+		return len(self.node_list)
+
+	def append(self, node):
+		self.node_list.append(node)
+
+	def __repr__(self):
+		return "Block(%r)" % self.node_list
+
+	def __eq__(self, other):
+		if(isinstance(other, Block)):
+			return self.node_list == other.node_list
+		else:
+			return False
+	
+	def __hash__(self):
+		return hash(tuple(self.node_list))
+
 class Partition:
 	def __init__(self, blocks):
 		self.blocks = blocks
 
 	def __repr__(self):
-		return repr(self.blocks)
+		return "Partition(%r)" % self.blocks
 
 	def get_copy(self):
 		new_block_list = []
 		for block in self.blocks:
-			new_block_list.append(list(block))
+			new_block_list.append(Block(list(block.node_list)))
 		return Partition(new_block_list)
 
 	def __getitem__(self, key):
 		return self.blocks[key]
+	
+	def __setitem__(self, key, value):
+		self.blocks[key] = value
+
+	def __len__(self):
+		return len(self.blocks)
+	
+	def __eq__(self, other):
+		if(isinstance(other, Partition)):
+			return self.blocks == other.blocks
+		else:
+			return False
+	
+	def __hash__(self):
+		return hash(tuple(self.blocks))
+
 
 class Function:
 	def __init__(self, dictionary):
@@ -217,7 +306,17 @@ class Function:
 	def __getitem__(self, key):
 		return self.dictionary[key]
 
+	def __setitem__(self, key, value):
+		self.dictionary[key] = value
 
+	def __eq__(self, other):
+		if(isinstance(other, Function)):
+			return self.dictionary == other.dictionary
+		else:
+			return False
+	
+	def __hash__(self):
+		return hash(tuple(list(self.dictionary.keys()) + list(self.dictionary.values())))
 
-
-
+	def __repr__(self):
+		return "Function(%r)" % self.dictionary
