@@ -5,7 +5,7 @@ import matplotlib.pyplot as mpl
 
 def test_create_introduce_node():
 
-    test_td = td.Tree_Decomposer(nx.Graph())
+    test_td = td.Tree_Decomposer(nx.complete_graph(2))
 
     test_graph = nx.DiGraph()
     test_root = frozenset({1,2,3,4,5})
@@ -102,7 +102,7 @@ def test_create_introduce_node():
 
 def test_create_join_node():
 
-    test_td = td.Tree_Decomposer(nx.Graph())
+    test_td = td.Tree_Decomposer(nx.complete_graph(2))
 
     test_graph = nx.DiGraph()
     test_root = frozenset({1,2,3,4,5})
@@ -173,14 +173,14 @@ def test_generate_partitions_with_2_blocks():
 
     test_set_with_objects = {test_object1,test_object2,test_object3}
 
-    test_td = td.Tree_Decomposer(nx.Graph())
+    test_td = td.Tree_Decomposer(nx.complete_graph(2))
 
     assert test_td.generate_partitions_with_2_blocks(test_set), ""
     assert test_td.generate_partitions_with_2_blocks(test_set_with_objects), ""
 
 def test_create_forget_node():
     
-    test_td = td.Tree_Decomposer(nx.Graph())
+    test_td = td.Tree_Decomposer(nx.complete_graph(2))
 
     test_graph = nx.DiGraph()
     test_root = frozenset({1,2,3,4,5})

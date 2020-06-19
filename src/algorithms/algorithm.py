@@ -235,8 +235,49 @@ class Algorithm:
 			if(block_containing_u != block_containing_w):
 				result.add((u,w))
 		return result
-				
+	
+	# a function here is just a dictionary that maps its unique inputs values to output values and fulfills the conditions from algorithm 3
+	def algorithm3_function_generator(self, parent_function, partition_without_block_containing_v, block_containing_v, refinement, h):
+		all_functions = set()
+		basic_function = Function({})
 
+		# each block from the original partition has to have the same value
+		for block in partition_without_block_containing_v:
+			basic_function.dictionary[block] = parent_function[block]
+		
+		# every function will be created with the basic_function as basis because every function has to fulfill the above condition
+		all_functions.add(basic_function)
+
+		c_of_block_containing_v = parent_function[block_containing_v]
+		inserted_blocks = set()
+		for block in refinement:
+
+			for function in all_functions:
+
+				sum_of_refinement_blocks_currently_assigned = 0
+				for inserted_block in inserted_blocks:
+					sum_of_refinement_blocks_currently_assigned += function[inserted_block]
+
+				new_all_functions = set()
+
+				# if block is the last block then its value is the remainder
+				if len(refinement.blocks) - len(inserted_blocks) == 1:
+					new_function = Function(dict(function.dictionary))
+					new_function.dictionary[block] = c_of_block_containing_v - 1 - sum_of_refinement_blocks_currently_assigned
+					new_all_functions.add(new_function)
+
+				# - len(refinement.symmetric_difference(inserted_blocks)) is necassary because every c'(block)>=1
+				else:
+					for value in range(1, c_of_block_containing_v - 1 - sum_of_refinement_blocks_currently_assigned - len(set(refinement.blocks).symmetric_difference(inserted_blocks))):
+						new_function = Function(dict(function.dictionary))
+						new_function.dictionary[block] = value
+						new_all_functions.add(new_function)
+
+			all_functions = new_all_functions
+			inserted_blocks.add(block)
+
+		return all_functions
+			
 
 # We need a wrapper class in order to have hashable lists for the set of Partitions
 class Block:
