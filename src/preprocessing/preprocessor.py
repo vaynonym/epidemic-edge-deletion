@@ -21,20 +21,29 @@ class Preprocessor:
 
 		district_graph = nx.Graph()
 
-		name_dictionary = {}
-		position_dictionary = {}
-		for district1 in district_list:
-				district_graph.add_node(district1)
-				name_dictionary[district1] = district1.district_name
-				position_dictionary[district1] = district1.polygon_coordinate
-				for district2 in district_list:
-						if(not district1 == district2 and district1.do_bounding_boxes_intersect(district2)):
-								if(not district2 in district1.neighbours):
-										district1.neighbours.append(district2)    
-								if(not district1 in district2.neighbours):
-										district2.neighbours.append(district1)
-								
-								district_graph.add_edge(district1, district2)
+		name_dictionary = dict()
+		position_dictionary = dict()
+
+		identifier_to_district_dictionary = dict()
+		identifier = 0
+
+		for district in district_list:
+			identifier_to_district_dictionary[identifier] = district
+			identifier += 1
+		
+		for i in range(identifier):
+			district_graph.add_node(i)
+			district1 = identifier_to_district_dictionary[i]
+			name_dictionary[i] = district1.district_name
+			position_dictionary[i] = district1.polygon_coordinate
+			for j in range(identifier):
+				district2 = identifier_to_district_dictionary[j]
+				if(not i == j and district1.do_bounding_boxes_intersect(district2)):
+					if(not district2 in district1.neighbours):
+						district1.neighbours.append(district2)    
+					if(not district1 in district2.neighbours):
+						district2.neighbours.append(district1)			
+					district_graph.add_edge(i, j)
 
 		maxvalue=[0,0]
 		for key in position_dictionary:
@@ -52,11 +61,11 @@ class Preprocessor:
 		plt.figure(num=None, figsize=(15, 15), dpi=256)
 		
 		nx.draw_networkx_labels(district_graph,pos=position_dictionary, labels=name_dictionary,font_size=10)
-		nx.draw_networkx_nodes(district_graph,position_dictionary)
+		nx.draw_networkx_nodes(district_graph, position_dictionary)
 		nx.draw_networkx_edges(district_graph, position_dictionary)
 		plt.savefig('output/districts.png')
 
-		return district_graph
+		return district_graph, identifier_to_district_dictionary
 
 	def build_graph(district_list):
 		for district in district_list:

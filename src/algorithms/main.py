@@ -30,7 +30,7 @@ def main():
 	print()
 
 	preprocessor = prepro.Preprocessor()
-	graph =  preprocessor.load_data()
+	graph, identifier_to_district_dictionary = preprocessor.load_data()
 
 	print("District graph has %d nodes and %d edges." % ((len(graph.nodes), len(graph.edges))))
 
