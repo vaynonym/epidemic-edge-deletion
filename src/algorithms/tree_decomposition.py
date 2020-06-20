@@ -39,16 +39,17 @@ class Tree_Decomposer:
 			# if parent has only one child insert missing vertices (forget nodes between child and parent)
 			if len(list(self.graph.successors(node))) == 1:
 				# simple check if node already an introduce node
-				if len(node.bag) == len(list(self.graph.successors(node))[0].bag) + 1 and list(self.graph.successors(node))[0].bag.issubset(node.bag) :
-					for child in list(self.graph.successors(node)):
-							if not child in nodes_seen:
-								queue.extend([child])
+				child = list(self.graph.successors(node))[0]
+				if len(node.bag) == len(child.bag) + 1 and child.bag.issubset(node.bag):
+					for child1 in list(self.graph.successors(node)):
+							if not child1 in nodes_seen:
+								queue.extend([child1])
 					continue
 				# simple check if node is already a forget node
-				if len(node.bag) + 1 == len(list(self.graph.successors(node))[0].bag) and node.bag.issubset(list(self.graph.successors(node))[0].bag) :
-					for child in list(self.graph.successors(node)):
-						if not child in nodes_seen:
-							queue.extend([child])
+				if len(node.bag) + 1 == len(child.bag) and node.bag.issubset(child.bag) :
+					for child2 in list(self.graph.successors(node)):
+						if not child2 in nodes_seen:
+							queue.extend([child2])
 					continue
 				self.create_forget_nodes(node)
 			# technically, this if statement should not be neccessary i just put it there in desperation
@@ -86,17 +87,17 @@ class Tree_Decomposer:
 			for child in children_of_node:
 				self.graph.add_edge(new_parent, child)
 				self.graph.remove_edge(node, child)
-			node.node_type=node.INTRODUCE
+			node.node_type = node.INTRODUCE
 		return node
 
 	# when a node in the TD does not contain a vertex that is in the intersection of the children then create forget nodes until this is not true anymore
 	def create_forget_nodes(self, node):
 		child = list(self.graph.successors(node))[0]
 		child_without_parent = child.bag.difference(node.bag)
-		last_node=node
+		last_node = node
 		if not set() == child_without_parent:
 			for vertex in child_without_parent:
-				parent=last_node
+				parent = last_node
 				temp = set(parent.bag)
 				temp.add(vertex)
 				last_node = ntd.Nice_Tree_Node(temp)
@@ -106,6 +107,7 @@ class Tree_Decomposer:
 			self.graph.remove_node(last_node)
 			self.graph.add_edge(parent, child)
 			self.graph.remove_edge(node, child)
+			node.node_type = node.FORGET
 		return node
 
 	# only called if node has two or more children and is not a join node
@@ -226,21 +228,42 @@ class Tree_Decomposer:
 	# checks if every node is a nice tree node
 	def check_nice_tree_node_properties(self):
 		for node in list(self.graph.nodes):
+
+			if not len(list(self.graph.predecessors(node))) == 1:
+				if not node == self.graph_root:
+					return False
+
 			if len(list(self.graph.successors(node)))>2:
 				return False
+
 			if len(list(self.graph.successors(node)))==2:
+				# a node with 2 successors has to be a join node
+				# therefore the left child has to have the same bag,
 				if not set(list(self.graph.successors(node))[0].bag) == set(node.bag):
-					if node.node_type == node.JOIN:
-						return False
+					return False
+
+				# the right child has to have the same bag
 				if not set(list(self.graph.successors(node))[1].bag) == set(node.bag):
-					if node.node_type == node.JOIN:
-						return False
+					return False
+				
+				# and its type has to be set accordingly
+				if not node.node_type == node.JOIN:
+					return False
+				# if either of these conditions is not fulfilled something is wrong
+
 			if len(list(self.graph.successors(node)))==1:
-				if not ((len(node.bag) == len(list(self.graph.successors(node))[0].bag) + 1 and list(self.graph.successors(node))[0].bag.issubset(node.bag))
-					or (len(node.bag) + 1 == len(list(self.graph.successors(node))[0].bag) and node.bag.issubset(list(self.graph.successors(node))[0].bag))):
-					if node.node_type == node.INTRODUCE or node.node_type == node.FORGET:
-						return False
-			if len(list(self.graph.successors(node)))==0 and len(list(self.graph.predecessors(node)))==0:
-				if node.node_type == node.LEAF:
+				child  = list(self.graph.successors(node))[0]
+				# if the node is a introduce node everything is fine
+				if len(node.bag) == len(child.bag) + 1 and child.bag.issubset(node.bag) and node.node_type == node.INTRODUCE:
+					pass
+				# if the node is a forget node everything is fine
+				elif len(node.bag) + 1 == len(child.bag) and node.bag.issubset(child.bag) and node.node_type == node.FORGET:
+					pass
+				# but if the node has one successor and does not fulfill either of the above conditions something is wrong
+				else:
+					return False
+
+			if len(list(self.graph.successors(node)))==0:
+				if not node.node_type == node.LEAF:
 					return False
 		return True
