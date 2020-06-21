@@ -12,14 +12,12 @@ class Algorithm:
 		self.h = h
 		self.k = k
 		self.nice_tree_decomposition = nice_tree_decomposition
-		self.nodes_to_be_calculated = self.nice_tree_decomposition.find_leafs()
-		self.root = nice_tree_decomposition.root
 		self.component_signatures = dict()
 
 
 	def execute(self):
 
-	
+		self.root = self.nice_tree_decomposition.root
 		nodes_to_be_calculated = self.nice_tree_decomposition.find_leafs()
 		number_of_removed_nodes = ThreadSafeCounter(0)
 		while(not nodes_to_be_calculated == set()):

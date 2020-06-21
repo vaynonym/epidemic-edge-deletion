@@ -140,7 +140,7 @@ def test_find_component_signatures_of_join_nodes():
 
 def test_algorithm3_function_generator():
 
-    algo = alg.Algorithm(0,0,0,0)
+    algo = alg.Algorithm(nx.Graph(),nx.DiGraph(),0,0)
     h = 10
     dictionary = dict()
     partition = alg.Partition([])
