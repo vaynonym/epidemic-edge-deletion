@@ -29,9 +29,6 @@ class Tree_Decomposer:
 		
 			# if the node is a leaf then nothing has to be done
 			if len(list(self.graph.successors(node))) == 0:
-				for child in list(self.graph.successors(node)):
-						if not child in nodes_seen:
-							queue.extend([child])
 				node.node_type=node.LEAF
 				continue
 			# these three function calls will construct the nice td structur from a parent to each children
@@ -41,15 +38,22 @@ class Tree_Decomposer:
 				# simple check if node already an introduce node
 				child = list(self.graph.successors(node))[0]
 				if len(node.bag) == len(child.bag) + 1 and child.bag.issubset(node.bag):
-					for child1 in list(self.graph.successors(node)):
-							if not child1 in nodes_seen:
-								queue.extend([child1])
+					node.node_type = node.INTRODUCE
+					queue.extend([child])
 					continue
 				# simple check if node is already a forget node
 				if len(node.bag) + 1 == len(child.bag) and node.bag.issubset(child.bag) :
-					for child2 in list(self.graph.successors(node)):
-						if not child2 in nodes_seen:
-							queue.extend([child2])
+					node.node_type = node.FORGET
+					queue.extend([child])
+					continue
+
+				# bad solution
+				# when a node has more than 1 child and introduce nodes are created it might happen that the last introduce node has the same bag as one of the children
+				# and after creating a join node(s) bad things happen because one of the children of the join node will have a child with the same bag
+				if node.bag == child.bag:
+					self.graph.add_edge(list(self.graph.predecessors(node))[0], child)
+					self.graph.remove_node(node)
+					queue.extend([child])
 					continue
 				self.create_forget_nodes(node)
 			# technically, this if statement should not be neccessary i just put it there in desperation
