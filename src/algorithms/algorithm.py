@@ -420,7 +420,7 @@ class Algorithm:
 					min_value = val
 					min_set = val_set
 			if min_value <= self.k:
-				del_values[(node, state)] = (min_set, min_value) # TODO: Is just min_set here correct?
+				del_values[(node, state)] = (min_set, min_value)
 			else:
 				del_values[(node, state)] = (set(), math.inf)
 		return del_values
