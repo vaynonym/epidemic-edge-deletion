@@ -387,6 +387,8 @@ class Algorithm:
 					block_without_v = Block(list(block.node_list))
 					if (v in block_without_v):
 						block_without_v.node_list.remove(v)
+				
+					block
 
 					if len(block_without_v) == 0:
 						vSingleton = True
@@ -427,7 +429,7 @@ class Algorithm:
 		extended_partitions = list()
 		for i in range(len(partition.blocks)):
 			p = partition.get_copy()
-			p[i].node_list.append(new_node)
+			p[i].append(new_node)
 			extended_partitions.append(p)
 		return extended_partitions
 
@@ -445,8 +447,8 @@ def test_function(node):
 # We need a wrapper class in order to have hashable lists for the set of Partitions
 class Block:
 	def __init__(self, node_list):
-		self.node_list = node_list
-
+		self.node_list = sorted(node_list)
+		
 	def __getitem__(self, key):
 		return self.node_list[key]
 
@@ -458,6 +460,7 @@ class Block:
 
 	def append(self, node):
 		self.node_list.append(node)
+		self.node_list = sorted(self.node_list)
 
 	def __repr__(self):
 		return "Block(%r)" % self.node_list
