@@ -359,7 +359,83 @@ class Algorithm:
 			inserted_blocks.add(block)
 
 		return all_functions
-			
+
+	# Algorithm 4
+	def find_component_signatures_of_forget_node(self, node, child_node, del_values_child):
+		del_values = dict()
+		all_states = self.generate_possible_component_states_of_bag(node.bag, self.h)
+
+		child_extra_nodes = child_node.bag - node.bag
+		if (len(child_extra_nodes) != 1):
+			 raise ValueError
+
+		(v,) = child_extra_nodes
+
+		for state in all_states:
+			P = state[0]
+			c = state[1]
+
+			child_forget_inherited_states = list()
+			all_child_partitions = self.get_all_extended_partitions(P, v)
+
+			for child_partition in all_child_partitions:
+				all_child_functions = list()
+				child_c = Function(dict())
+				vSingleton = False
+
+				for block in child_partition:
+					block_without_v = Block(list(block.node_list))
+					if (v in block_without_v):
+						block_without_v.node_list.remove(v)
+
+					if len(block_without_v) == 0:
+						vSingleton = True
+					else:
+						# Algorithm from paper just reads 'child_c[block] = c[block_without_v]' here, which can
+						# result in invalid child_c functions (which the paper just ignores).
+						# We check all functions for validity below, before proceeding with the minimum search.
+						child_c[block] = c[block_without_v]
+				
+				if not vSingleton:
+					all_child_functions.append(child_c)
+				else:
+					for i in range(1, h + 1):
+						c_copy = Function(child_c.dictionary)
+						c_copy[Block([v])] = i
+						all_child_functions.append(c_copy)
+
+				# This doesn't quite match the pseudo-code, but it makes more sense and matches the
+				# reference implementation.
+				for c_i in all_child_functions:
+					if (self.is_valid_function(child_partition, c_i)):
+						child_forget_inherited_states.append((child_partition, c_i))
+
+			min_value = math.inf
+			min_set = set()
+			for sigma in child_forget_inherited_states:
+				(val_set, val) = del_values_child[(child_node, sigma)]
+				if val < min_value:
+					min_value = val
+					min_set = val_set
+			if min_value <= self.k:
+				del_values[(node, state)] = (min_set, min_value) # TODO: Is just min_set here correct?
+			else:
+				del_values[(node, state)] = (set(), math.inf)
+		return del_values
+
+	def get_all_extended_partitions(self, partition, new_node):
+		extended_partitions = list()
+		for i in range(len(partition.blocks)):
+			p = partition.get_copy()
+			p[i].node_list.append(new_node)
+			extended_partitions.append(p)
+		return extended_partitions
+
+	def is_valid_function(self, partition, function):
+		for block in partition:
+			if (function[block] < len(block)):
+				return False
+		return True
 
 
 

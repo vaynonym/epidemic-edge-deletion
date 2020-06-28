@@ -182,10 +182,29 @@ def test_algorithm3_function_generator():
         assert parent_function[last_block]-1 == sum_of_refinement_blocks, "c(X_r) != sum of refinement block values" 
     
 
+def test_find_component_signatures_of_forget_nodes():
+    # assemble
+    nodes = [1, 2, 3, 4, 5, 6]
+    #nodes = [1, 2]
+    graph = nx.Graph()
+    graph.add_nodes_from(nodes)
+    graph.add_edges_from(
+        [[node1, node2] for node2 in nodes for node1 in nodes if not node1 == node2]
+    )
+    nice_td = nx.Graph()
 
+    h = 3
+    k = 6
+    algo = alg.Algorithm(graph, nice_td, h, k)
     
-    
+    forget_node = ntd.Nice_Tree_Node([2, 3, 5])
+    #forget_node = ntd.Nice_Tree_Node([1])
 
-	
+    child_node = ntd.Nice_Tree_Node([2, 3, 4, 5])
+    #child_node = ntd.Nice_Tree_Node([1, 2])
+    child_del_values =  algo.find_component_signatures_of_leaf_nodes(child_node, child_node.bag)
 
+    # act
+    result = algo.find_component_signatures_of_forget_node(forget_node, child_node, child_del_values)
 
+    print(result)
