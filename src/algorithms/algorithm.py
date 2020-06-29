@@ -13,6 +13,7 @@ class Algorithm:
 		self.k = k
 		self.nice_tree_decomposition = nice_tree_decomposition
 		self.component_signatures = dict()
+		
 
 
 	def execute(self):
@@ -20,7 +21,9 @@ class Algorithm:
 		self.root = self.nice_tree_decomposition.root
 		nodes_to_be_calculated = self.nice_tree_decomposition.find_leafs()
 		number_of_removed_nodes = ThreadSafeCounter(0)
+		counter = multiprocessing.Value("i", 0)
 		while(not nodes_to_be_calculated == set()):
+			counter.value = 0
 			print(len(nodes_to_be_calculated))
 			new_nodes_to_be_calculated = set(nodes_to_be_calculated)
 			
@@ -32,10 +35,14 @@ class Algorithm:
 					nodes_that_can_be_calculated.append(node)
 					new_nodes_to_be_calculated.remove(node)
 					new_nodes_to_be_calculated.update(self.nice_tree_decomposition.predecessors(node))
-			p = multiprocessing.Pool(12)
-			calculated_nodes = p.map(self.calculate_component_signature_of_node, nodes_that_can_be_calculated)
-			p.close()
-			p.join()
+			print("{}  nodes can be calculated in this iteration.".format(len(nodes_that_can_be_calculated)))
+			pool = multiprocessing.Pool(processes=8, initializer=self.init, initargs=(counter, ))
+			with pool:
+				print("Starting Starmap now")
+				calculated_nodes = pool.starmap(self.calculate_component_signature_of_node, 
+					zip(nodes_that_can_be_calculated, [len(nodes_that_can_be_calculated)] * len(nodes_that_can_be_calculated)))
+
+			pool.join()
 			for calculation, node in zip(calculated_nodes, nodes_that_can_be_calculated):
 				self.component_signatures[node] = calculation
 				
@@ -55,23 +62,35 @@ class Algorithm:
 		return can_be_calculated == len(successors)
 
 	
-	def calculate_component_signature_of_node(self, node):
+	def init(self, args):
+		''' store the counter for later use '''
+		global counter
+		counter = args
+		print("created process")
+
+	def calculate_component_signature_of_node(self, node, number_of_nodes_in_iteration_that_can_be_calculated):
+		
+		print("Started calculating node of type {}".format(node.node_type))
+
+		global counter
+
+		result = dict()
 		if(node.node_type == ntd.Nice_Tree_Node.LEAF):
 			successors = list(self.nice_tree_decomposition.successors(node))
 			assert len(successors) == 0
-			return self.find_component_signatures_of_leaf_nodes(node, node.bag)
+			result = self.find_component_signatures_of_leaf_nodes(node, node.bag)
 		
 		elif(node.node_type == ntd.Nice_Tree_Node.INTRODUCE):
 			successors = list(self.nice_tree_decomposition.successors(node))
 			assert len(successors) == 1
 			child = successors[0]
-			return self.calculate_component_signature_of_introduce_node(node, node.bag, child, child.bag, self.component_signatures[child])
+			result = self.calculate_component_signature_of_introduce_node(node, node.bag, child, child.bag, self.component_signatures[child])
 
 		elif(node.node_type == ntd.Nice_Tree_Node.FORGET):
 			successors = list(self.nice_tree_decomposition.successors(node))
 			assert len(successors) == 1
 			child = successors[0]
-			return self.find_component_signatures_of_forget_node(node, child, self.component_signatures[child])
+			result = self.find_component_signatures_of_forget_node(node, child, self.component_signatures[child])
 
 		else: 
 			assert node.node_type == ntd.Nice_Tree_Node.JOIN
@@ -80,7 +99,14 @@ class Algorithm:
 			child_1 = successors[0]
 			child_2 = successors[1]
 			del_values_child = dict(self.component_signatures[child_1]).update(self.component_signatures[child_2])
-			return find_component_signatures_of_join_nodes(node, node.bag, child_1, child_2, del_values_child)
+			result = find_component_signatures_of_join_nodes(node, node.bag, child_1, child_2, del_values_child)
+
+		with counter.get_lock():
+			counter.value += 1
+		
+		print("Finished Calculating node of type {}. Counter is now at {} out of {}".format(node.node_type, counter.value,
+			number_of_nodes_in_iteration_that_can_be_calculated))
+		return result
 
 
 	def generate_possible_component_states_of_bag(self, bag, h):
