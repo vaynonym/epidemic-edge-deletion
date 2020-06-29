@@ -41,7 +41,6 @@ class Algorithm:
 				
 			nodes_to_be_calculated = new_nodes_to_be_calculated
 			print("Done!")
-			return True
 		
 		return component_signatures[self.root]
 
@@ -196,17 +195,22 @@ class Algorithm:
 
 		# v is a set containing the node
 		v = bag.symmetric_difference(child_bag)
+		# v is not a set anymore
+		v = list(v)[0]
 		block_containing_v = set()
-
-		# find block containing v
-		for block in state[0]:
-			if v.issubset(block):
-				block_containing_v = block
 
 		for state in all_States:
 			introduce_inhereted_cStates = set()
-			partition_without_block_containing_v = state[0].symmetric_difference(set(block_containing_v))
-			refinements = self.generate_partitions_of_bag_of_size(block_containing_v.symmetric_difference(v), len(block_containing_v.symmetric_difference(v)))
+
+			# find block containing v
+			for block in state[0]:
+				if v in block:
+					block_containing_v = block
+
+			partition_without_block_containing_v = Partition(list(state[0].symmetric_difference(Partition([block_containing_v]))))
+
+			block_without_v = Block(block_containing_v.symmetric_difference(Block([v])))
+			refinements = self.generate_partitions_of_bag_of_size(block_without_v, len(block_without_v))
 
 			for refinement in refinements:
 				partition_prime = partition_without_block_containing_v.union(refinement)
@@ -220,21 +224,17 @@ class Algorithm:
 
 			for state_prime in introduce_inhereted_cStates:
 				# unsure whether state should be state_prime or not (paper says state)
-				edge_set = edges_connecting_blocks_in_partition(self.graph.subgraph(bag).edges , state)
-				value = del_values_child[(child, state_prime)] + len(edge_set)
+				edge_set = self.edges_connecting_blocks_in_partition(self.graph.subgraph(bag).edges , state)
+				value = (del_values_child[(child, state_prime)])[1] + len(edge_set)
 				if value < minValue:
 					minValue = value
 					minValue_edge_set = edge_set
 
-			if minValue <= k:
+			if minValue <= self.k:
 				del_Values[(introduce_node, state)] = (minValue_edge_set, minValue)
 			else:
 				del_Values[(introduce_node, state)] = (set(), math.inf)
 		return del_Values
-
-	# Algorithm 4
-	def find_component_signatures_of_forget_node(self, node, child_node, del_values_child):
-		return dict()
 
 	# Algorithm 5
 	def find_component_signatures_of_join_nodes(self, join_node, bag, child_1, child_2, del_values_child):
@@ -474,6 +474,9 @@ class Block:
 	def __hash__(self):
 		return hash(tuple(self.node_list))
 
+	def symmetric_difference(self, block):
+		return set(self.node_list).symmetric_difference(set(block.node_list))
+
 class Partition:
 	def __init__(self, blocks):
 		self.blocks = blocks
@@ -498,12 +501,18 @@ class Partition:
 	
 	def __eq__(self, other):
 		if(isinstance(other, Partition)):
-			return self.blocks == other.blocks
+			return set(self.blocks) == set(other.blocks)
 		else:
 			return False
 	
 	def __hash__(self):
-		return hash(tuple(self.blocks))
+		return hash(tuple(set(self.blocks)))
+
+	def symmetric_difference(self, partition):
+		return set(self.blocks).symmetric_difference(set(partition.blocks))
+
+	def union(self, partition):
+		return Partition(list(set(self.blocks).union(set(partition.blocks))))
 
 
 class Function:
@@ -523,7 +532,7 @@ class Function:
 			return False
 	
 	def __hash__(self):
-		return hash(tuple(list(self.dictionary.keys()) + list(self.dictionary.values())))
+		return hash(tuple( set(self.dictionary.keys()).union(set(self.dictionary.values())) ))
 
 	def __repr__(self):
 		return "Function(%r)" % self.dictionary
