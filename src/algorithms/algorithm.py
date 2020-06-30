@@ -4,6 +4,7 @@ import src.algorithms.nice_tree_decomposition as ntd
 import multiprocessing
 import threading
 import sys
+import traceback
 
 class Algorithm:
 	
@@ -17,8 +18,19 @@ class Algorithm:
 
 
 	def execute(self):
+		process_count = 11
+
+		work_queue = multiprocessing.Queue()
+		result_queue = multiprocessing.Queue()
+
+		processes = []
+		for i in range(process_count):
+			p = multiprocessing.Process(target=worker, args=(self.graph, self.nice_tree_decomposition, self.h, self.k, work_queue, result_queue))
+			p.start()
+			processes.append(p)
 
 		self.root = self.nice_tree_decomposition.root
+<<<<<<< HEAD
 		nodes_to_be_calculated = self.nice_tree_decomposition.find_leafs()
 		number_of_removed_nodes = ThreadSafeCounter(0)
 		counter = multiprocessing.Value("i", 0)
@@ -48,20 +60,101 @@ class Algorithm:
 				
 			nodes_to_be_calculated = new_nodes_to_be_calculated
 			print("Done!")
+=======
+		leafs = self.nice_tree_decomposition.find_leafs()
+
+		calculated_nodes = 0
+		total_nodes = len(self.nice_tree_decomposition.graph.nodes)
+
+		print("Created processes, starting work")
+
+		# Start off by queuing all leafs
+		for node in leafs:
+			work_queue.put((node, None, None))
+
+		while (calculated_nodes < total_nodes):
+			# Read a single result
+			(node, component_signature) = result_queue.get()
+			# Store the component signature for later and track that the node is done
+			self.component_signatures[node] = component_signature
+			calculated_nodes += 1
+			# Find all nodes which are now calculable because this one is done and queue them
+			predecessors = self.nice_tree_decomposition.predecessors(node)
+			for pred in predecessors:
+				can_calculate_pred = True
+				child_signatures = dict()
+				children = list(self.nice_tree_decomposition.successors(pred))
+				for child in children:
+					if (not child in self.component_signatures.keys()):
+						can_calculate_pred = False
+					else:
+						child_signatures.update(self.component_signatures[child])
+				if (can_calculate_pred):
+					work_queue.put((pred, children, child_signatures))
+
+			# Print some intermediate status results
+			print("Calculated %d nodes so far..." % calculated_nodes)
+
+		#while(len(calculatable_nodes) != 0):
+		#	print(len(calculatable_nodes))
+		#	new_nodes_to_be_calculated = set(nodes_to_be_calculated)
+		#	
+		#	nodes_that_can_be_calculated = []
+		#	for node in nodes_to_be_calculated:
+		#		if(self.can_node_be_calculated(node)):
+		#			nodes_that_can_be_calculated.append(node)
+		#			new_nodes_to_be_calculated.remove(node)
+		#			new_nodes_to_be_calculated.update(self.nice_tree_decomposition.predecessors(node))
+		#	p = multiprocessing.Pool(12)
+		#	calculated_nodes = p.map(self.calculate_component_signature_of_node, nodes_that_can_be_calculated)
+		#	p.close()
+		#	p.join()
+		#	for calculation, node in zip(calculated_nodes, nodes_that_can_be_calculated):
+		#		self.component_signatures[node] = calculation
+		#		
+		#	nodes_to_be_calculated = new_nodes_to_be_calculated
+		#	print("Done!")
+		#	# return True*/
+>>>>>>> multiprocessing-queue
 		
 		return component_signatures[self.root]
 
 
 	def can_node_be_calculated(self, node):
 		can_be_calculated = 0
-		successors = list(self.nice_tree_decomposition.successors(node))
+		successors = self.nice_tree_decomposition.successors(node)
 		for successor in successors:
-			if(successor in self.component_signatures.keys()):
-				can_be_calculated = can_be_calculated + 1
+			if (not successor in self.component_signatures.keys()):
+				return False
 		
-		return can_be_calculated == len(successors)
+		return True
 
+def worker(graph, nice_tree_decomposition, h, k, work_queue, result_queue):
+	alg = AlgorithmWorker(graph, nice_tree_decomposition, h, k)
+	(node, children, child_component_signatures) = work_queue.get()
+	while (node != None):
+		try:
+			print ("Worker starting %s node: %r" % (node.node_type, node))
+			component_signature = alg.calculate_component_signature_of_node(node, children, child_component_signatures)
+			result_queue.put((node, component_signature))
+			print ("Worker finished %s node: %r" % (node.node_type, node))
+
+			(node, children, child_component_signatures) = work_queue.get()
+		except KeyError as e:
+			print("\n====================\nEncountered error: %s" % e)
+			print("Traceback: %s" % traceback.format_exc())
+			print("node is %r" % node)
+			print("children is %r" % children)
+			print("child_component_signatures is %r" % child_component_signatures)
+
+class AlgorithmWorker:
+	def __init__(self, graph, nice_tree_decomposition, h, k):
+		self.graph = graph
+		self.h = h
+		self.k = k
+		self.nice_tree_decomposition = nice_tree_decomposition
 	
+<<<<<<< HEAD
 	def init(self, args):
 		''' store the counter for later use '''
 		global counter
@@ -107,6 +200,25 @@ class Algorithm:
 		print("Finished Calculating node of type {}. Counter is now at {} out of {}".format(node.node_type, counter.value,
 			number_of_nodes_in_iteration_that_can_be_calculated))
 		return result
+=======
+	def calculate_component_signature_of_node(self, node, children, child_component_signatures):
+		if(node.node_type == ntd.Nice_Tree_Node.LEAF):
+			return self.find_component_signatures_of_leaf_nodes(node, node.bag)
+		
+		elif(node.node_type == ntd.Nice_Tree_Node.INTRODUCE):
+			child = children[0]
+			return self.calculate_component_signature_of_introduce_node(node, node.bag, child, child.bag, child_component_signatures)
+
+		elif(node.node_type == ntd.Nice_Tree_Node.FORGET):
+			child = children[0]
+			return self.find_component_signatures_of_forget_node(node, child, child_component_signatures)
+
+		else: 
+			assert node.node_type == ntd.Nice_Tree_Node.JOIN
+			child_1 = children[0]
+			child_2 = children[1]
+			return self.find_component_signatures_of_join_nodes(node, node.bag, child_1, child_2, child_component_signatures)
+>>>>>>> multiprocessing-queue
 
 
 	def generate_possible_component_states_of_bag(self, bag, h):
@@ -139,6 +251,7 @@ class Algorithm:
 						new_partition = partition.get_copy()
 						
 						new_partition[i].append(node)
+						new_partition.sort()
 
 						# check if identical partition already exists
 						does_identical_partition_exist = False
@@ -292,7 +405,7 @@ class Algorithm:
 				del_values[join_node, (P, c)] = (set(), math.inf)
 
 		return del_values
-				
+
 
 	def get_all_function_pairs(self, partition, c):
 		all_function_pairs = set()
@@ -427,7 +540,7 @@ class Algorithm:
 				if not vSingleton:
 					all_child_functions.append(child_c)
 				else:
-					for i in range(1, h + 1):
+					for i in range(1, self.h + 1):
 						c_copy = Function(child_c.dictionary)
 						c_copy[Block([v])] = i
 						all_child_functions.append(c_copy)
@@ -456,7 +569,12 @@ class Algorithm:
 		for i in range(len(partition.blocks)):
 			p = partition.get_copy()
 			p[i].append(new_node)
+			p.sort()
 			extended_partitions.append(p)
+		p = partition.get_copy()
+		p.blocks.append(Block([new_node]))
+		p.sort()
+		extended_partitions.append(p)
 		return extended_partitions
 
 	def is_valid_function(self, partition, function):
@@ -464,11 +582,6 @@ class Algorithm:
 			if (function[block] < len(block)):
 				return False
 		return True
-
-
-
-def test_function(node):
-	return "TRUE"
 
 # We need a wrapper class in order to have hashable lists for the set of Partitions
 class Block:
@@ -497,6 +610,15 @@ class Block:
 		else:
 			return False
 	
+	def __lt__(self, other):
+		if not isinstance(other, Block):
+			return NotImplemented
+		if (len(self.node_list) == 0):
+			return True
+		if (len(other.node_list) == 0):
+			return False
+		return self.node_list[0] < other.node_list[0]
+
 	def __hash__(self):
 		return hash(tuple(self.node_list))
 
@@ -505,7 +627,7 @@ class Block:
 
 class Partition:
 	def __init__(self, blocks):
-		self.blocks = blocks
+		self.blocks = sorted(blocks)
 
 	def __repr__(self):
 		return "Partition(%r)" % self.blocks
@@ -516,6 +638,11 @@ class Partition:
 			new_block_list.append(Block(list(block.node_list)))
 		return Partition(new_block_list)
 
+	# It's not great that we ever need to do this manually, would be good to avoid
+	# the calls to this when generating partitions.
+	def sort(self):
+		self.blocks = sorted(self.blocks)
+
 	def __getitem__(self, key):
 		return self.blocks[key]
 	
@@ -524,7 +651,7 @@ class Partition:
 
 	def __len__(self):
 		return len(self.blocks)
-	
+
 	def __eq__(self, other):
 		if(isinstance(other, Partition)):
 			return set(self.blocks) == set(other.blocks)
@@ -553,12 +680,23 @@ class Function:
 
 	def __eq__(self, other):
 		if(isinstance(other, Function)):
-			return self.dictionary == other.dictionary
+			# TODO: Can this be done more efficiently?
+			for key, value in self.dictionary.items():
+				if not key in other.dictionary:
+					return False
+				if value != other.dictionary[key]:
+					return False
+			for key, value in other.dictionary.items():
+				if not key in self.dictionary:
+					return False
+				if value != self.dictionary[key]:
+					return False
+			return True
 		else:
 			return False
 	
 	def __hash__(self):
-		return hash(tuple( set(self.dictionary.keys()).union(set(self.dictionary.values())) ))
+		return hash(tuple(sorted(self.dictionary.keys()) + sorted(self.dictionary.values())))
 
 	def __repr__(self):
 		return "Function(%r)" % self.dictionary

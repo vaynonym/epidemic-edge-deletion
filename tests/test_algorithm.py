@@ -24,7 +24,7 @@ def test_functions():
 def test_generate_partitions_of_bag_of_size():
 
     #assemble
-    algo = alg.Algorithm(nx.Graph(), nx.Graph(), 0, 0)
+    algo = alg.AlgorithmWorker(nx.Graph(), nx.Graph(), 0, 0)
     
     max_size = 5
     bag = set([1,2,3,4,5,6,7])
@@ -53,7 +53,7 @@ def test_generate_partitions_of_bag_of_size():
 def test_generate_all_functions_of_partition():
     # assemble
     max_size = 7
-    algo = alg.Algorithm(nx.Graph(), nx.Graph(), max_size, 0)
+    algo = alg.AlgorithmWorker(nx.Graph(), nx.Graph(), max_size, 0)
 
 
     partition = alg.Partition([alg.Block([1,2,6,4,5]), alg.Block([6,10,3]), alg.Block([9,7,11,12]), alg.Block([13,14,15,16])])
@@ -86,7 +86,7 @@ def test_find_component_signatures_of_leaf_nodes():
     nice_tree_decomposition = nx.Graph()
     h = 3
     k = 6
-    algo = alg.Algorithm(graph, nice_tree_decomposition, h, k)
+    algo = alg.AlgorithmWorker(graph, nice_tree_decomposition, h, k)
     
     bag = ntd.Nice_Tree_Node([2, 3, 4, 5])
 
@@ -111,7 +111,7 @@ def test_find_component_signatures_of_join_nodes():
 
     h = 3
     k = 6
-    algo = alg.Algorithm(graph, nice_tree_decomposition, h, k)
+    algo = alg.AlgorithmWorker(graph, nice_tree_decomposition, h, k)
     
     TD_join_node = ntd.Nice_Tree_Node([2, 3, 4, 5])
 
@@ -140,7 +140,7 @@ def test_find_component_signatures_of_join_nodes():
 
 def test_algorithm3_function_generator():
 
-    algo = alg.Algorithm(nx.Graph(),nx.DiGraph(),0,0)
+    algo = alg.AlgorithmWorker(nx.Graph(),nx.DiGraph(),0,0)
     h = 10
     dictionary = dict()
     partition = alg.Partition([])
@@ -195,7 +195,7 @@ def test_find_component_signatures_of_forget_nodes():
 
     h = 3
     k = 6
-    algo = alg.Algorithm(graph, nice_td, h, k)
+    algo = alg.AlgorithmWorker(graph, nice_td, h, k)
     
     forget_node = ntd.Nice_Tree_Node([2, 3, 5])
     #forget_node = ntd.Nice_Tree_Node([1])
@@ -222,7 +222,7 @@ def test_calculate_component_signatures_of_introduce_node():
 
     h = 3
     k = 6
-    algo = alg.Algorithm(graph, nice_td, h, k)
+    algo = alg.AlgorithmWorker(graph, nice_td, h, k)
     
     introduce_node = ntd.Nice_Tree_Node([2, 3, 4, 5])
     #introduce_node = ntd.Nice_Tree_Node([1])
