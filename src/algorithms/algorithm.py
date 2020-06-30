@@ -597,7 +597,17 @@ class Function:
 
 	def __eq__(self, other):
 		if(isinstance(other, Function)):
-			return self.dictionary == other.dictionary
+			# TODO: Can this be done more efficiently?
+			for key, value in self.dictionary.items():
+				if not key in other.dictionary:
+					return False
+				if not value == other.dictionary[key]:
+					return False
+			for key, value in other.dictionary.items():
+				if not key in self.dictionary:
+					return False
+				if not value == self.dictionary[key]:
+					return False
 		else:
 			return False
 	
