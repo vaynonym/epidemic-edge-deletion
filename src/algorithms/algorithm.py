@@ -4,6 +4,7 @@ import src.algorithms.nice_tree_decomposition as ntd
 import multiprocessing
 import threading
 import sys
+import traceback
 
 class Algorithm:
 	
@@ -16,7 +17,7 @@ class Algorithm:
 
 
 	def execute(self):
-		process_count = 12
+		process_count = 11
 
 		work_queue = multiprocessing.Queue()
 		result_queue = multiprocessing.Queue()
@@ -33,6 +34,8 @@ class Algorithm:
 		calculated_nodes = 0
 		total_nodes = len(self.nice_tree_decomposition.graph.nodes)
 
+		print("Created processes, starting work")
+
 		# Start off by queuing all leafs
 		for node in leafs:
 			work_queue.put((node, None, None))
@@ -47,22 +50,18 @@ class Algorithm:
 			predecessors = self.nice_tree_decomposition.predecessors(node)
 			for pred in predecessors:
 				can_calculate_pred = True
-				child_signatures = None
+				child_signatures = dict()
 				children = list(self.nice_tree_decomposition.successors(pred))
 				for child in children:
 					if (not child in self.component_signatures.keys()):
 						can_calculate_pred = False
 					else:
-						if (child_signatures == None):
-							child_signatures = self.component_signatures[child]
-						else:
-							child_signatures.update(self.component_signatures[child])
+						child_signatures.update(self.component_signatures[child])
 				if (can_calculate_pred):
 					work_queue.put((pred, children, child_signatures))
 
 			# Print some intermediate status results
-			if (calculated_nodes % 10 == 0):
-				print("Calculated %d nodes so far..." % calculated_nodes)
+			print("Calculated %d nodes so far..." % calculated_nodes)
 
 		#while(len(calculatable_nodes) != 0):
 		#	print(len(calculatable_nodes))
@@ -102,15 +101,18 @@ def worker(graph, nice_tree_decomposition, h, k, work_queue, result_queue):
 	(node, children, child_component_signatures) = work_queue.get()
 	while (node != None):
 		try:
+			print ("Worker starting %s node: %r" % (node.node_type, node))
 			component_signature = alg.calculate_component_signature_of_node(node, children, child_component_signatures)
 			result_queue.put((node, component_signature))
+			print ("Worker finished %s node: %r" % (node.node_type, node))
+
 			(node, children, child_component_signatures) = work_queue.get()
 		except KeyError as e:
 			print("\n====================\nEncountered error: %s" % e)
+			print("Traceback: %s" % traceback.format_exc())
 			print("node is %r" % node)
 			print("children is %r" % children)
 			print("child_component_signatures is %r" % child_component_signatures)
-			raise
 
 class AlgorithmWorker:
 	def __init__(self, graph, nice_tree_decomposition, h, k):
@@ -135,7 +137,7 @@ class AlgorithmWorker:
 			assert node.node_type == ntd.Nice_Tree_Node.JOIN
 			child_1 = children[0]
 			child_2 = children[1]
-			return find_component_signatures_of_join_nodes(node, node.bag, child_1, child_2, child_component_signatures)
+			return self.find_component_signatures_of_join_nodes(node, node.bag, child_1, child_2, child_component_signatures)
 
 
 	def generate_possible_component_states_of_bag(self, bag, h):
@@ -601,18 +603,19 @@ class Function:
 			for key, value in self.dictionary.items():
 				if not key in other.dictionary:
 					return False
-				if not value == other.dictionary[key]:
+				if value != other.dictionary[key]:
 					return False
 			for key, value in other.dictionary.items():
 				if not key in self.dictionary:
 					return False
-				if not value == self.dictionary[key]:
+				if value != self.dictionary[key]:
 					return False
+			return True
 		else:
 			return False
 	
 	def __hash__(self):
-		return hash(tuple(set(self.dictionary.keys()).union(set(self.dictionary.values())) ))
+		return hash(tuple(sorted(self.dictionary.keys()) + sorted(self.dictionary.values())))
 
 	def __repr__(self):
 		return "Function(%r)" % self.dictionary
