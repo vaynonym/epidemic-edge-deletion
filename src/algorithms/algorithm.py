@@ -6,6 +6,12 @@ import multiprocessing
 import threading
 import sys
 import traceback
+import gc
+import psutil
+import os
+from setproctitle import setproctitle 
+
+from guppy import hpy
 
 class Algorithm:
 	
@@ -15,23 +21,22 @@ class Algorithm:
 		self.k = k
 		self.nice_tree_decomposition = nice_tree_decomposition
 		self.component_signatures = dict()
-		
-
+		setproctitle("Epidemic Edge Deletion")
 
 	def execute(self):
-		process_count = 11
+		self.root = self.nice_tree_decomposition.root
+		leafs = self.nice_tree_decomposition.find_leafs()
+
+		process_count = min(6, len(leafs))
 
 		work_queue = multiprocessing.Queue()
 		result_queue = multiprocessing.Queue()
 
 		processes = []
 		for i in range(process_count):
-			p = multiprocessing.Process(target=worker, args=(self.graph, self.nice_tree_decomposition, self.h, self.k, work_queue, result_queue))
+			p = multiprocessing.Process(target=worker, args=(i, self.graph, self.nice_tree_decomposition, self.h, self.k, work_queue, result_queue))
 			p.start()
 			processes.append(p)
-
-		self.root = self.nice_tree_decomposition.root
-		leafs = self.nice_tree_decomposition.find_leafs()
 
 		calculated_nodes = 0
 		total_nodes = len(self.nice_tree_decomposition.graph.nodes)
@@ -39,8 +44,8 @@ class Algorithm:
 		print("Created processes, starting work")
 
 		# Start off by queuing all leafs
-		for node in leafs:
-			work_queue.put((node, None, None))
+		for i in range(process_count):
+			work_queue.put((leafs.pop(-1), None, None))
 
 		while (calculated_nodes < total_nodes):
 			# Read a single result
@@ -63,7 +68,9 @@ class Algorithm:
 					else:
 						child_signatures.update(self.component_signatures[child])
 				if (can_calculate_pred):
-					work_queue.put((pred, children, child_signatures))
+					self.queue_work(work_queue, pred, children, child_signatures)
+				elif (len(leafs) > 0):
+					self.queue_work(work_queue, leafs.pop(-1), None, None)
 
 			# Print some intermediate status results
 			print("Calculated %d nodes so far..." % calculated_nodes)
@@ -96,6 +103,15 @@ class Algorithm:
 		#	# return True*/
 		
 		return self.component_signatures[self.root]
+
+	def queue_work(self, work_queue, node, children, child_signatures):
+		work_queue.put((node, children, child_signatures))
+
+		if (children == None):
+			 return
+
+		for child in children:
+			del self.component_signatures[child]
 
 	def validate_signature(self, node, signature):
 		# Compute G[V_t]
@@ -159,20 +175,33 @@ class Algorithm:
 		
 		return True
 
-def worker(graph, nice_tree_decomposition, h, k, work_queue, result_queue):
+def worker(process_index, graph, nice_tree_decomposition, h, k, work_queue, result_queue):
+	setproctitle("Epidemic Edge Deletion Worker %d" % process_index)
+
+	this_process = psutil.Process(os.getpid())
+	hp = hpy()
+		
 	alg = AlgorithmWorker(graph, nice_tree_decomposition, h, k)
+
+	hp.setrelheap()
+
 	(node, children, child_component_signatures) = work_queue.get()
 	while (node != None):
 		try:
-			#print ("Worker starting %s node: %r" % (node.node_type, node))
+			print ("[P%d] Worker starting %s node: %r" % (process_index, node.node_type, node))
 			component_signature = alg.calculate_component_signature_of_node(node, children, child_component_signatures)
 			result_queue.put((node, component_signature))
-			print ("Worker finished %s node: %r" % (node.node_type, node))
+			print ("[P%d] Worker finished %s node: %r" % (process_index, node.node_type, node))
 
 			node = None
 			children = None
 			child_component_signatures = None
 			component_signature = None
+
+			print("[P%d] Memory usage before GC: %d" % (process_index, this_process.memory_info().rss))
+			gc.collect()
+			print("[P%d] Memory usage after GC: %d" % (process_index, this_process.memory_info().rss))
+			print("[P%d] Heap: %s" % (process_index, hp.heap()))
 
 			(node, children, child_component_signatures) = work_queue.get()
 		except KeyError as e:
@@ -222,7 +251,7 @@ class AlgorithmWorker:
 		partitions = set()
 		initial_partition = Partition([])
 		for node in bag:
-			initial_partition.blocks.append(Block([]))
+			initial_partition.append(Block([]))
 
 		partitions.add(initial_partition)
 
@@ -244,7 +273,7 @@ class AlgorithmWorker:
 						does_identical_partition_exist = False
 						for existing_partition in new_partitions:
 							is_a_block_different = False
-							for block in existing_partition.blocks:
+							for block in existing_partition:
 								if not block in new_partition:
 									is_a_block_different = True
 									break
@@ -260,11 +289,11 @@ class AlgorithmWorker:
 		for partition in partitions:
 			blocks_to_remove = []
 			for block in partition:
-				if block.node_list == [] :
+				if len(block) == 0 :
 					blocks_to_remove.append(block)
 			
 			for block in blocks_to_remove:
-				partition.blocks.remove(block)
+				partition.remove(block)
 
 		return partitions
 
@@ -274,20 +303,20 @@ class AlgorithmWorker:
 		all_functions.add(Function({})) # initial set of undefined functions used to generate the rest
 
 		# partially define function by setting the mapping for each block
-		for block in partition.blocks:
+		for block in partition:
 
 			# for each possible value that a block could be mapped to
 			new_all_functions = []
 			for codomain_value in range(1, h+1):
 				# if that value is legal
-				if codomain_value >= len(block.node_list):
+				if codomain_value >= len(block):
 					# then for each function that already exists
 					for function in all_functions:
 						# create a new function with the only difference being
 						# that the new block now has a mapping in that function
 
 						new_function = Function(dict(function.dictionary))
-						new_function.dictionary[block] = codomain_value
+						new_function[block] = codomain_value
 						new_all_functions.append(new_function)
 			
 			all_functions = new_all_functions
@@ -451,9 +480,9 @@ class AlgorithmWorker:
 			block_containing_u = None
 			block_containing_w = None
 			for block in partition:
-				if(u in block.node_list):
+				if(u in block):
 					block_containing_u = block
-				if(w in block.node_list):
+				if(w in block):
 					block_containing_w = block
 				
 				if(block_containing_u != None and block_containing_w != None):
@@ -469,7 +498,7 @@ class AlgorithmWorker:
 
 		block_containing_node = None
 		for block in partition:
-			if (node in block.node_list):
+			if (node in block):
 				block_containing_node = block
 				break
 
@@ -483,7 +512,7 @@ class AlgorithmWorker:
 
 			block_containing_to_search = None
 			for block in partition:
-				if(to_search in block.node_list):
+				if(to_search in block):
 					block_containing_to_search = block
 					break
 
@@ -499,7 +528,7 @@ class AlgorithmWorker:
 
 		# each block from the original partition has to have the same value
 		for block in partition_without_block_containing_v:
-			basic_function.dictionary[block] = parent_function[block]
+			basic_function[block] = parent_function[block]
 		
 		# every function will be created with the basic_function as basis because every function has to fulfill the above condition
 		all_functions.add(basic_function)
@@ -517,16 +546,16 @@ class AlgorithmWorker:
 				new_all_functions = set()
 
 				# if block is the last block then its value is the remainder
-				if len(refinement.blocks) - len(inserted_blocks) == 1:
+				if len(refinement) - len(inserted_blocks) == 1:
 					new_function = Function(dict(function.dictionary))
-					new_function.dictionary[block] = c_of_block_containing_v - 1 - sum_of_refinement_blocks_currently_assigned
+					new_function[block] = c_of_block_containing_v - 1 - sum_of_refinement_blocks_currently_assigned
 					new_all_functions.add(new_function)
 
 				# - len(refinement.symmetric_difference(inserted_blocks)) is necassary because every c'(block)>=1
 				else:
-					for value in range(1, c_of_block_containing_v - 1 - sum_of_refinement_blocks_currently_assigned - len(set(refinement.blocks).symmetric_difference(inserted_blocks))):
+					for value in range(len(block), c_of_block_containing_v - 1 - sum_of_refinement_blocks_currently_assigned - len(set(refinement.blocks).symmetric_difference(inserted_blocks))):
 						new_function = Function(dict(function.dictionary))
-						new_function.dictionary[block] = value
+						new_function[block] = value
 						new_all_functions.add(new_function)
 
 			all_functions = new_all_functions
@@ -560,9 +589,7 @@ class AlgorithmWorker:
 				for block in child_partition:
 					block_without_v = Block(list(block.node_list))
 					if (v in block_without_v):
-						block_without_v.node_list.remove(v)
-				
-					block
+						block_without_v.remove(v)
 
 					if len(block_without_v) == 0:
 						vSingleton = True
@@ -576,7 +603,7 @@ class AlgorithmWorker:
 					all_child_functions.append(child_c)
 				else:
 					for i in range(1, self.h + 1):
-						c_copy = Function(child_c.dictionary)
+						c_copy = Function(dict(child_c.dictionary))
 						c_copy[Block([v])] = i
 						all_child_functions.append(c_copy)
 
@@ -601,13 +628,13 @@ class AlgorithmWorker:
 
 	def get_all_extended_partitions(self, partition, new_node):
 		extended_partitions = list()
-		for i in range(len(partition.blocks)):
+		for i in range(len(partition)):
 			p = partition.get_copy()
 			p[i].append(new_node)
 			p.sort()
 			extended_partitions.append(p)
 		p = partition.get_copy()
-		p.blocks.append(Block([new_node]))
+		p.append(Block([new_node]))
 		p.sort()
 		extended_partitions.append(p)
 		return extended_partitions
@@ -622,12 +649,16 @@ class AlgorithmWorker:
 class Block:
 	def __init__(self, node_list):
 		self.node_list = sorted(node_list)
+		self.hash = None
+		self.calculate_hash()
 		
 	def __getitem__(self, key):
 		return self.node_list[key]
 
 	def __setitem__(self, key, value):
 		self.node_list[key] = value
+		self.node_list = sorted(self.node_list)
+		self.calculate_hash()
 
 	def __len__(self):
 		return len(self.node_list)
@@ -635,13 +666,19 @@ class Block:
 	def append(self, node):
 		self.node_list.append(node)
 		self.node_list = sorted(self.node_list)
+		self.calculate_hash()
+
+	def remove(self, node):
+		self.node_list.remove(node)
+		self.node_list = sorted(self.node_list)
+		self.calculate_hash()
 
 	def __repr__(self):
 		return "Block(%r)" % self.node_list
 
 	def __eq__(self, other):
 		if(isinstance(other, Block)):
-			return self.node_list == other.node_list
+			return set(self.node_list) == set(other.node_list)
 		else:
 			return False
 	
@@ -655,7 +692,10 @@ class Block:
 		return self.node_list[0] < other.node_list[0]
 
 	def __hash__(self):
-		return hash(tuple(self.node_list))
+		return self.hash
+	
+	def calculate_hash(self):
+		self.hash = hash(tuple(self.node_list))
 
 	def symmetric_difference(self, block):
 		return set(self.node_list).symmetric_difference(set(block.node_list))
@@ -663,6 +703,8 @@ class Block:
 class Partition:
 	def __init__(self, blocks):
 		self.blocks = sorted(blocks)
+		self.hash = None
+		self.calculate_hash()
 
 	def __repr__(self):
 		return "Partition(%r)" % self.blocks
@@ -677,12 +719,22 @@ class Partition:
 	# the calls to this when generating partitions.
 	def sort(self):
 		self.blocks = sorted(self.blocks)
+		self.calculate_hash()
 
 	def __getitem__(self, key):
 		return self.blocks[key]
 	
 	def __setitem__(self, key, value):
 		self.blocks[key] = value
+		self.sort()
+
+	def remove(self, value):
+		self.blocks.remove(value)
+		self.sort()
+
+	def append(self, value):
+		self.blocks.append(value)
+		self.sort()
 
 	def __len__(self):
 		return len(self.blocks)
@@ -694,7 +746,10 @@ class Partition:
 			return False
 	
 	def __hash__(self):
-		return hash(tuple(set(self.blocks)))
+		return self.hash
+
+	def calculate_hash(self):
+		self.hash = hash(tuple(set(self.blocks)))
 
 	def symmetric_difference(self, partition):
 		return set(self.blocks).symmetric_difference(set(partition.blocks))
@@ -706,12 +761,15 @@ class Partition:
 class Function:
 	def __init__(self, dictionary):
 		self.dictionary = dictionary
+		self.hash = None
+		self.calculate_hash()
 
 	def __getitem__(self, key):
 		return self.dictionary[key]
 
 	def __setitem__(self, key, value):
 		self.dictionary[key] = value
+		self.calculate_hash()
 
 	def __eq__(self, other):
 		if(isinstance(other, Function)):
@@ -731,7 +789,10 @@ class Function:
 			return False
 	
 	def __hash__(self):
-		return hash(tuple(sorted(self.dictionary.keys()) + sorted(self.dictionary.values())))
+		return self.hash
+
+	def calculate_hash(self):
+		self.hash = hash(tuple(sorted(self.dictionary.keys()) + sorted(self.dictionary.values())))
 
 	def __repr__(self):
 		return "Function(%r)" % self.dictionary

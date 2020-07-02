@@ -66,9 +66,16 @@ class Tree_Decomposer:
 		return self.graph
 	
 	def choose_root(self):
-    	# for now chosen randomly
+		# for now chosen randomly
 		# list(graph) returns a list of the nodes (random.choice needs iterable object)
-		self.graph_root = random.choice(list(self.graph.nodes))
+		highest_deg = 0
+		node_with_hg = None
+		for node in self.graph.nodes():
+			node_deg = len(set(self.graph.neighbors(node)))
+			if node_deg > highest_deg:
+				node_with_hg = node
+				highest_deg = node_deg
+		self.graph_root = node_with_hg
 
 	# always called
 	# when a node in the TD contains a vertex that none of its children contain then create one introduce node

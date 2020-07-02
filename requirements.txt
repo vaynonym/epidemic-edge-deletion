@@ -3,5 +3,6 @@ networkx==2.4
 pytest==5.4.2
 geojson==2.5
 matplotlib==3.1.2
-
-
+setproctitle==1.1.10
+psutil==5.7
+guppy3==3.0.10.post1

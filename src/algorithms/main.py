@@ -49,8 +49,8 @@ def main(h, k, state_filter):
 	print("NTD has %d nodes" % len(nice_tree_decomposition.graph.nodes))
 	print("Nice properties: %r" % tree_decomposer.check_nice_tree_node_properties())
 
-	#print_graph(nice_tree_decomposition, 'output/ntd.png', False)
-	#print_graph(nice_tree_decomposition, 'output/ntd_planar.png', True)
+	print_graph(nice_tree_decomposition.graph, 'output/ntd.png', False)
+	print_graph(nice_tree_decomposition.graph, 'output/ntd_planar.png', True)
 
 	print("  __________________________")
 	print(" /		            \\")
