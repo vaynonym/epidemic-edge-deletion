@@ -5,6 +5,7 @@ import src.preprocessing.preprocessor as prepro
 import src.algorithms.tree_decomposition as td
 import src.algorithms.algorithm as algo
 import src.algorithms.nice_tree_decomposition as ntd
+import math
 
 def print_graph(graph, filename, planar):
 	plt.figure(num=None, figsize=(35, 35), dpi=128)
@@ -30,7 +31,7 @@ def main():
 	print()
 
 	preprocessor = prepro.Preprocessor()
-	graph, identifier_to_district_dictionary = preprocessor.load_data()
+	graph, identifier_to_district_dictionary, position_dictionary, name_dictionary = preprocessor.load_data()
 
 	print("District graph has %d nodes and %d edges." % ((len(graph.nodes), len(graph.edges))))
 
@@ -55,18 +56,45 @@ def main():
 	print(" \\__________________________/")
 	print()
 
-	h = 3
-	k = 3
+	h = 40
+	k = 100
 	algorithm = algo.Algorithm(graph, nice_tree_decomposition, h, k)
-	result = algorithm.execute()	
+	root_node_signature = algorithm.execute()
 	
-	print("result:")
-	print(result)
+	#print("result:")
+	#print(root_node_signature)
 	print("  __________________________")
 	print(" /	 	            \\")
 	print("|  ...Programm is finished   |")
 	print(" \\__________________________/")
-	return result
+	
+	print(interpret_result(root_node_signature, identifier_to_district_dictionary, position_dictionary, name_dictionary, graph))
+	
+
+
+def interpret_result(root_node_signature, identifier_to_district_dictionary, position_dictionary, name_dictionary, graph):
+	min_val = math.inf
+	min_edges = set()
+	for (edges, val) in root_node_signature.values():
+		if (val < min_val):
+			min_val = val
+			min_edges = edges
+
+	print("Found an edge set to delete with %f edges: %s" % (min_val, min_edges))
+
+	graph.remove_edges_from(min_edges)
+
+	plt.figure(num=None, figsize=(15, 15), dpi=256)
+		
+	nx.draw_networkx_labels(graph,pos=position_dictionary, labels=name_dictionary,font_size=10)
+	nx.draw_networkx_labels(graph,pos=position_dictionary, labels=name_dictionary,font_size=10)
+	nx.draw_networkx_nodes(graph, position_dictionary)
+	nx.draw_networkx_edges(graph, position_dictionary)
+	plt.savefig('output/districtsWithDeletedEdges.png')
+
+	return True
+
+	
 
 if __name__ == "__main__":
 	main()

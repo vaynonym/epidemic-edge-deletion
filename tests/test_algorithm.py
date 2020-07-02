@@ -110,30 +110,33 @@ def test_find_component_signatures_of_join_nodes():
     nice_tree_decomposition = nx.Graph()
 
     h = 3
-    k = 6
+    k = 5
     algo = alg.AlgorithmWorker(graph, nice_tree_decomposition, h, k)
     
     TD_join_node = ntd.Nice_Tree_Node([2, 3, 4, 5])
 
-    TD_child_node_1 = ntd.Nice_Tree_Node([2, 3, 4, 5])
+    TD_child_node_1 = ntd.Nice_Tree_Node([1, 2, 3, 4, 5])
     TD_child_node_1_del_k =  algo.find_component_signatures_of_leaf_nodes(TD_child_node_1, TD_child_node_1.bag)
+    TD_child_node_3 = ntd.Nice_Tree_Node([2,3,4,5])
+    TD_child_node_3_del_k =  algo.find_component_signatures_of_forget_node(TD_child_node_3, TD_child_node_1, TD_child_node_1_del_k)
 
     TD_child_node_2 = ntd.Nice_Tree_Node([2, 3, 4, 5])
     TD_child_node_2_del_k =  algo.find_component_signatures_of_leaf_nodes(TD_child_node_2, TD_child_node_2.bag)
 
 
     # merge both dictionaries
-    TD_child_node_1_del_k.update(TD_child_node_2_del_k)
-    del_values_child = TD_child_node_1_del_k
+    TD_child_node_2_del_k.update(TD_child_node_3_del_k)
+    del_values_child = TD_child_node_2_del_k
     #print(del_values_child)
 
 
     # act
-    result = algo.find_component_signatures_of_join_nodes(TD_join_node, TD_join_node.bag, TD_child_node_1, TD_child_node_2, del_values_child)
+    result = algo.find_component_signatures_of_join_nodes(TD_join_node, TD_join_node.bag, TD_child_node_3, TD_child_node_2, del_values_child)
 
     # assert (lol)
-    #for key, del_value in result.items():
-    #    print(del_value)
+    for key, del_value in result.items():
+        print(del_value)
+    assert False
 
 
 

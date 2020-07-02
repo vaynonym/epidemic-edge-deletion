@@ -17,7 +17,9 @@ class Preprocessor:
 		
 		district_list = [ DistrictPolygon(district)
 											for district in data_dump["features"]
-											if district.properties["type_2"] != "Water body"]
+											if district.properties["type_2"] != "Water body"
+												and district.properties["name_1"] == "Bayern"]
+
 
 		district_graph = nx.Graph()
 
@@ -60,12 +62,13 @@ class Preprocessor:
 
 		plt.figure(num=None, figsize=(15, 15), dpi=256)
 		
-		nx.draw_networkx_labels(district_graph,pos=position_dictionary, labels=name_dictionary,font_size=10)
+		#nx.draw_networkx_labels(district_graph,pos=position_dictionary, labels=name_dictionary,font_size=10)
+		nx.draw_networkx_labels(district_graph, pos=position_dictionary, font_size=10)
 		nx.draw_networkx_nodes(district_graph, position_dictionary)
 		nx.draw_networkx_edges(district_graph, position_dictionary)
 		plt.savefig('output/districts.png')
 
-		return district_graph, identifier_to_district_dictionary
+		return district_graph, identifier_to_district_dictionary, position_dictionary, name_dictionary
 
 	def build_graph(district_list):
 		for district in district_list:

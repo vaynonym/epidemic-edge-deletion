@@ -1,6 +1,7 @@
 import copy
 import math
 import src.algorithms.nice_tree_decomposition as ntd
+import networkx as nx
 import multiprocessing
 import threading
 import sys
@@ -44,6 +45,9 @@ class Algorithm:
 		while (calculated_nodes < total_nodes):
 			# Read a single result
 			(node, component_signature) = result_queue.get()
+			
+			#self.validate_signature(node, component_signature)
+
 			# Store the component signature for later and track that the node is done
 			self.component_signatures[node] = component_signature
 			calculated_nodes += 1
@@ -63,6 +67,12 @@ class Algorithm:
 
 			# Print some intermediate status results
 			print("Calculated %d nodes so far..." % calculated_nodes)
+
+		for p in processes:
+			work_queue.put((None, None, None))
+
+		for p in processes:
+			p.join()
 
 		#while(len(calculatable_nodes) != 0):
 		#	print(len(calculatable_nodes))
@@ -85,8 +95,60 @@ class Algorithm:
 		#	print("Done!")
 		#	# return True*/
 		
-		return component_signatures[self.root]
+		return self.component_signatures[self.root]
 
+	def validate_signature(self, node, signature):
+		# Compute G[V_t]
+		v_t = self.get_v_t(node)
+
+		for (edges, val) in signature.values():
+			if (val == math.inf and edges == set()):
+				continue
+
+			if (val != len(edges)):
+				print("Found a non-matching pair: %f, %s" % (val, edges))
+				print("Node was: %r" % node)
+
+			# Remove edges in signature from G[V_t]
+			subgraph = nx.Graph(self.graph.subgraph(v_t))
+			subgraph.remove_edges_from(edges)
+			# Check if largest component is small enough
+			max_component = max([len(c) for c in nx.connected_components(subgraph)])
+
+			if (max_component > self.h):
+				print("\n\nFound a pair that leaves a too-large component:")
+				self.print_node_info(node, v_t, (val, edges))
+
+			# Is the greatest component in G[node.bag] <= self.h?
+			#components = nx.connected_components(self.graph.subgraph(node.bag))
+			#max_component = max([len(c) for c in components])
+			#is_bag_with_all_edges_valid = max_component <= self.h
+
+			#if (edges == set() and not is_bag_with_all_edges_valid):
+			#	print("Found an empty set that can't be empty: %f, %s" % (val, edges))
+			#	print("Node was: %r" % node)
+
+	def print_node_info(self, node, v_t, sig):
+		(val, edges) = sig
+		print("error signature: %f, %s" % (val, edges))
+		print("from node: %r" % node)
+		print("with v_t: %r" % v_t)
+		print("children:")
+		for child in self.nice_tree_decomposition.successors(node):
+			self.print_node_info_complete(child)
+
+	def print_node_info_complete(self, node, prefix = ""):
+		print("%snode: %r" % (prefix, node))
+		print("%scomp_signature: %r" % (prefix, self.component_signatures[node]))
+		for child in self.nice_tree_decomposition.successors(node):
+			self.print_node_info_complete(child, prefix + "\t")
+
+	def get_v_t(self, node):
+		v_t = set()
+		v_t.update(node.bag)
+		for s in self.nice_tree_decomposition.successors(node):
+			v_t.update(self.get_v_t(s))
+		return v_t
 
 	def can_node_be_calculated(self, node):
 		can_be_calculated = 0
@@ -102,10 +164,15 @@ def worker(graph, nice_tree_decomposition, h, k, work_queue, result_queue):
 	(node, children, child_component_signatures) = work_queue.get()
 	while (node != None):
 		try:
-			print ("Worker starting %s node: %r" % (node.node_type, node))
+			#print ("Worker starting %s node: %r" % (node.node_type, node))
 			component_signature = alg.calculate_component_signature_of_node(node, children, child_component_signatures)
 			result_queue.put((node, component_signature))
 			print ("Worker finished %s node: %r" % (node.node_type, node))
+
+			node = None
+			children = None
+			child_component_signatures = None
+			component_signature = None
 
 			(node, children, child_component_signatures) = work_queue.get()
 		except KeyError as e:
@@ -283,11 +350,15 @@ class AlgorithmWorker:
 
 			for state_prime in introduce_inhereted_cStates:
 				# unsure whether state should be state_prime or not (paper says state)
-				edge_set = self.edges_connecting_blocks_in_partition(self.graph.subgraph(bag).edges , state)
+				edge_set = self.edges_connecting_node_with_other_block_in_partition(v, bag, state[0])
 				value = (del_values_child[(child, state_prime)])[1] + len(edge_set)
 				if value < minValue:
 					minValue = value
-					minValue_edge_set = edge_set
+					minValue_edge_set = edge_set.union((del_values_child[(child, state_prime)])[0])
+					#if (len(minValue_edge_set) != minValue):
+					#	print("\n\nOH NO: minValue: %f, edge set: %r" % (minValue, minValue_edge_set))
+					#	print("child_set: %r" % (del_values_child[(child, state_prime)])[0])
+					#	print("edge_set: %r\n\n" % edge_set)
 
 			if minValue <= self.k:
 				del_Values[(introduce_node, state)] = (minValue_edge_set, minValue)
@@ -311,13 +382,28 @@ class AlgorithmWorker:
 			minValue = math.inf
 			minValueSet = set()
 			for (sigma_1, sigma_2) in sigma_t1_t2_join:
+				tuple_child_1 = del_values_child[(child_1, sigma_1)]
+				tuple_child_2 = del_values_child[(child_2, sigma_2)]
+
 				edges_connecting_blocks_in_partition = self.edges_connecting_blocks_in_partition(bag, P)
-				value = (del_values_child[(child_1, sigma_1)][1] + del_values_child[(child_2, sigma_2)][1] 
+				value = (tuple_child_1[1] + tuple_child_2[1] 
 						 - len(edges_connecting_blocks_in_partition))
+
+				if (value == -1):
+					print("\n___________________________________\n")
+					print("Found a -1 value!")
+					print("Node: %r" % join_node)
+					print("Child1: %r" % child_1)
+					print("tuple1:{}".format(tuple_child_1))
+					print("Child2: %r" % child_2)
+					print("tuple2: {}".format(tuple_child_2))
+					print("edges_connecting: %r" % edges_connecting_blocks_in_partition)
 
 				if(value < minValue):
 					minValue = value
-					minValueSet = edges_connecting_blocks_in_partition
+					# minValueSet = edges_connecting_blocks_in_partition
+					minValueSet = tuple_child_1[0].union(tuple_child_2[0])#.difference(edges_connecting_blocks_in_partition)
+					#edges_connecting_blocks_in_partition
 
 			if(minValue <= self.k):
 				del_values[join_node, (P, c)] = (minValueSet, minValue)
@@ -362,19 +448,48 @@ class AlgorithmWorker:
 		induced_subgraph_edges = self.graph.subgraph(list(bag)).edges
 		result = set()
 		for (u,w) in induced_subgraph_edges:
-			block_containing_u = Block(set())
-			block_containing_w = Block(set())
+			block_containing_u = None
+			block_containing_w = None
 			for block in partition:
 				if(u in block.node_list):
 					block_containing_u = block
 				if(w in block.node_list):
 					block_containing_w = block
 				
-				if(block_containing_u.node_list != set() and block_containing_w.node_list != set()):
+				if(block_containing_u != None and block_containing_w != None):
 					break
 				
 			if(block_containing_u != block_containing_w):
 				result.add((u,w))
+		return result
+
+	def edges_connecting_node_with_other_block_in_partition(self, node, bag, partition):
+		induced_subgraph_edges = self.graph.subgraph(list(bag)).edges
+		result = set()
+
+		block_containing_node = None
+		for block in partition:
+			if (node in block.node_list):
+				block_containing_node = block
+				break
+
+		for (u,w) in induced_subgraph_edges:
+			if (u == node):
+				to_search = w
+			elif (w == node):
+				to_search = u
+			else:
+				continue
+
+			block_containing_to_search = None
+			for block in partition:
+				if(to_search in block.node_list):
+					block_containing_to_search = block
+					break
+
+			if (block_containing_node != block_containing_to_search):
+				result.add((u,w))
+
 		return result
 	
 	# a function here is just a dictionary that maps its unique inputs values to output values and fulfills the conditions from algorithm 3
@@ -641,4 +756,3 @@ class HashableDictionary(dict):
 		return hash(self.__key())
 	def __eq__(self, other):
 		return self.__key() == other.__key()
-
