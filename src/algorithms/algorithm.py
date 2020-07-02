@@ -81,27 +81,6 @@ class Algorithm:
 		for p in processes:
 			p.join()
 
-		#while(len(calculatable_nodes) != 0):
-		#	print(len(calculatable_nodes))
-		#	new_nodes_to_be_calculated = set(nodes_to_be_calculated)
-		#	
-		#	nodes_that_can_be_calculated = []
-		#	for node in nodes_to_be_calculated:
-		#		if(self.can_node_be_calculated(node)):
-		#			nodes_that_can_be_calculated.append(node)
-		#			new_nodes_to_be_calculated.remove(node)
-		#			new_nodes_to_be_calculated.update(self.nice_tree_decomposition.predecessors(node))
-		#	p = multiprocessing.Pool(12)
-		#	calculated_nodes = p.map(self.calculate_component_signature_of_node, nodes_that_can_be_calculated)
-		#	p.close()
-		#	p.join()
-		#	for calculation, node in zip(calculated_nodes, nodes_that_can_be_calculated):
-		#		self.component_signatures[node] = calculation
-		#		
-		#	nodes_to_be_calculated = new_nodes_to_be_calculated
-		#	print("Done!")
-		#	# return True*/
-		
 		return self.component_signatures[self.root]
 
 	def queue_work(self, work_queue, node, children, child_signatures):
