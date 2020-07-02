@@ -10,15 +10,21 @@ class Preprocessor:
 	def __init__(self):
 		pass
 
-	def load_data(self):
+	def load_data(self, state_filter):
 		file = open("data/landkreise-in-germany.geojson", 'r')
 		data_dump = geojson.load(file)
 		file.close()
 		
-		district_list = [ DistrictPolygon(district)
-											for district in data_dump["features"]
-											if district.properties["type_2"] != "Water body"
-												and district.properties["name_1"] == "Bayern"]
+		if (state_filter == None):
+			district_list = [ DistrictPolygon(district)
+								for district in data_dump["features"]
+								if district.properties["type_2"] != "Water body"]
+		else:
+			district_list = [ DistrictPolygon(district)
+								for district in data_dump["features"]
+								if district.properties["type_2"] != "Water body"
+									and district.properties["name_1"] == state_filter]
+			
 
 
 		district_graph = nx.Graph()

@@ -6,6 +6,8 @@ import src.algorithms.tree_decomposition as td
 import src.algorithms.algorithm as algo
 import src.algorithms.nice_tree_decomposition as ntd
 import math
+import sys
+from argparse import ArgumentParser
 
 def print_graph(graph, filename, planar):
 	plt.figure(num=None, figsize=(35, 35), dpi=128)
@@ -16,7 +18,7 @@ def print_graph(graph, filename, planar):
 
 	plt.savefig(filename)
 
-def main():
+def main(h, k, state_filter):
 
 	print("  __________________________")
 	print(" /		            \\")
@@ -31,7 +33,7 @@ def main():
 	print()
 
 	preprocessor = prepro.Preprocessor()
-	graph, identifier_to_district_dictionary, position_dictionary, name_dictionary = preprocessor.load_data()
+	graph, identifier_to_district_dictionary, position_dictionary, name_dictionary = preprocessor.load_data(state_filter)
 
 	print("District graph has %d nodes and %d edges." % ((len(graph.nodes), len(graph.edges))))
 
@@ -56,8 +58,6 @@ def main():
 	print(" \\__________________________/")
 	print()
 
-	h = 40
-	k = 100
 	algorithm = algo.Algorithm(graph, nice_tree_decomposition, h, k)
 	root_node_signature = algorithm.execute()
 	
@@ -97,4 +97,18 @@ def interpret_result(root_node_signature, identifier_to_district_dictionary, pos
 	
 
 if __name__ == "__main__":
-	main()
+	parser = ArgumentParser(add_help=False)
+	parser.add_argument("-s", "--state")
+	parser.add_argument("-h", type=int)
+	parser.add_argument("-k", type=int)
+	args = parser.parse_args()
+
+	if (args.h == None):
+		print("Error: -h parameter is required!")
+		sys.exit(1)
+
+	if (args.k == None):
+		print("Error: -k paramter is required!")
+		sys.exit(1)
+
+	main(args.h, args.k, args.state)
