@@ -43,7 +43,6 @@ class Algorithm:
 
 		print("Created processes, starting work")
 
-		# Start off by queuing all leafs
 		for i in range(process_count):
 			work_queue.put((leafs.pop(-1), None, None))
 
@@ -83,8 +82,62 @@ class Algorithm:
 
 		return self.component_signatures[self.root]
 
+	def execute_singlethreaded(self):
+		self.root = self.nice_tree_decomposition.root
+		leafs = self.nice_tree_decomposition.find_leafs()
+
+		algWorker = AlgorithmWorker(self.graph, self.nice_tree_decomposition, self.h, self.k)
+
+		calculated_nodes = 0
+		total_nodes = len(self.nice_tree_decomposition.graph.nodes)
+
+		calculatable_nodes = []
+		calculatable_nodes.append((leafs.pop(-1), None, None))
+
+		while (calculated_nodes < total_nodes):
+			(node, children, child_component_signatures) = calculatable_nodes.pop(-1)
+
+			print ("Starting %s node: %r" % (node.node_type, node))
+			component_signature = algWorker.calculate_component_signature_of_node(node, children, child_component_signatures)
+
+			#self.validate_signature(node, component_signature)
+
+			# Store the component signature for later and track that the node is done
+			self.component_signatures[node] = component_signature
+			calculated_nodes += 1
+
+			# Find all nodes which are now calculable because this one is done and queue them
+			predecessors = self.nice_tree_decomposition.predecessors(node)
+			for pred in predecessors:
+				can_calculate_pred = True
+				child_signatures = dict()
+				children = list(self.nice_tree_decomposition.successors(pred))
+				for child in children:
+					if (not child in self.component_signatures.keys()):
+						can_calculate_pred = False
+					else:
+						child_signatures.update(self.component_signatures[child])
+				if (can_calculate_pred):
+					self.queue_work_singlethreaded(calculatable_nodes, pred, children, child_signatures)
+				elif (len(leafs) > 0):
+					self.queue_work_singlethreaded(calculatable_nodes, leafs.pop(-1), None, None)
+
+			# Print some intermediate status results
+			print("Calculated %d nodes so far..." % calculated_nodes)
+
+		return self.component_signatures[self.root]
+
 	def queue_work(self, work_queue, node, children, child_signatures):
 		work_queue.put((node, children, child_signatures))
+
+		if (children == None):
+			 return
+
+		for child in children:
+			del self.component_signatures[child]
+
+	def queue_work_singlethreaded(self, calculatable_nodes, node, children, child_signatures):
+		calculatable_nodes.append((node, children, child_signatures))
 
 		if (children == None):
 			 return

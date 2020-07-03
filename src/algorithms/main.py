@@ -18,7 +18,7 @@ def print_graph(graph, filename, planar):
 
 	plt.savefig(filename)
 
-def main(h, k, state_filter):
+def main(h, k, state_filter, singlethreaded):
 
 	print("  __________________________")
 	print(" /		            \\")
@@ -59,7 +59,11 @@ def main(h, k, state_filter):
 	print()
 
 	algorithm = algo.Algorithm(graph, nice_tree_decomposition, h, k)
-	root_node_signature = algorithm.execute()
+	root_node_signature = None
+	if(singlethreaded):
+		root_node_signature = algorithm.execute_singlethreaded()
+	else:
+		root_node_signature = algorithm.execute()
 	
 	#print("result:")
 	#print(root_node_signature)
@@ -101,6 +105,7 @@ if __name__ == "__main__":
 	parser.add_argument("-s", "--state")
 	parser.add_argument("-h", type=int)
 	parser.add_argument("-k", type=int)
+	parser.add_argument("--singlethreaded", action='store_true')
 	args = parser.parse_args()
 
 	if (args.h == None):
@@ -111,4 +116,4 @@ if __name__ == "__main__":
 		print("Error: -k paramter is required!")
 		sys.exit(1)
 
-	main(args.h, args.k, args.state)
+	main(args.h, args.k, args.state, args.singlethreaded)
