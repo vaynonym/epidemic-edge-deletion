@@ -2,10 +2,15 @@ import networkx as nx
 import geojson
 import copy
 import functools
+import os.path
+
+
 
 import matplotlib.pyplot as plt
 
 POINT_PROXIMITY_TOLERANCE = 3
+
+FILE_BASE_NAME = "data/graph"
 
 class Preprocessor:
 
@@ -37,24 +42,36 @@ class Preprocessor:
 		identifier_to_district_dictionary = dict()
 		identifier = 0
 
+		graph_file_name = FILE_BASE_NAME + "_" + ("_".join(state_filter))
+
 		for district in district_list:
 			identifier_to_district_dictionary[identifier] = district
 			identifier += 1
 		
-		for i in range(identifier):
-			district_graph.add_node(i)
-			district1 = identifier_to_district_dictionary[i]
-			name_dictionary[i] = district1.district_name
-			position_dictionary[i] = district1.polygon_coordinate
-			for j in range(i + 1, identifier):
-				district2 = identifier_to_district_dictionary[j]
-				if( district1.do_bounding_boxes_intersect(district2) and district.do_districts_intersect(district2)):
-					if(not district2 in district1.neighbours):
-						district1.neighbours.append(district2)    
-					if(not district1 in district2.neighbours):
-						district2.neighbours.append(district1)
-					district_graph.add_edge(i, j)
-			print("Finished {count} out of {max_count}".format(count = i, max_count = identifier))
+	
+
+		if os.path.exists(graph_file_name):
+			district_graph = load(graph_file_name)
+			for i in range(identifier):
+				district1 = identifier_to_district_dictionary[i]
+				name_dictionary[i] = district1.district_name
+				position_dictionary[i] = district1.polygon_coordinate
+		else:
+			for i in range(identifier):
+				district_graph.add_node(i)
+				district1 = identifier_to_district_dictionary[i]
+				name_dictionary[i] = district1.district_name
+				position_dictionary[i] = district1.polygon_coordinate
+				for j in range(i + 1, identifier):
+					district2 = identifier_to_district_dictionary[j]
+					if( district1.do_bounding_boxes_intersect(district2) and district.do_districts_intersect(district2)):
+						#if(not district2 in district1.neighbours):
+						#	district1.neighbours.append(district2)    
+						#if(not district1 in district2.neighbours):
+						#	district2.neighbours.append(district1)
+						district_graph.add_edge(i, j)
+				print("Finished {count} out of {max_count}".format(count = i, max_count = identifier))
+			save(district_graph, graph_file_name)
 
 		maxvalue=[0,0]
 		for key in position_dictionary:
@@ -70,18 +87,24 @@ class Preprocessor:
 				position[1] = position[1]/maxvalue[1]
 
 		plt.figure(num=None, figsize=(15, 15), dpi=256)
+
+		print(position_dictionary)
 		
-		nx.draw_networkx_labels(district_graph,pos=position_dictionary, labels=name_dictionary,font_size=10)
-		nx.draw_networkx_labels(district_graph, pos=position_dictionary, font_size=10)
-		nx.draw_networkx_nodes(district_graph, position_dictionary)
-		nx.draw_networkx_edges(district_graph, position_dictionary)
+		nx.draw_networkx_labels(district_graph,pos= position_dictionary, labels=name_dictionary,font_size=10)
+		# nx.draw_networkx_labels(district_graph, pos=position_dictionary, font_size=10)
+		nx.draw_networkx_nodes(district_graph, pos = position_dictionary)
+		nx.draw_networkx_edges(district_graph, pos = position_dictionary)
 		plt.savefig('output/districts.png')
 
 		return district_graph, identifier_to_district_dictionary, position_dictionary, name_dictionary
 
-	def build_graph(district_list):
-		for district in district_list:
-			pass
+def save(G, fname):
+	nx.write_gpickle(G, fname)
+
+def load(fname):
+	return nx.read_gpickle(fname)
+
+	
 
 @functools.total_ordering
 class DistrictPolygon:
