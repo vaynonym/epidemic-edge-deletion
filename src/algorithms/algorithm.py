@@ -27,7 +27,7 @@ class Algorithm:
 		self.root = self.nice_tree_decomposition.root
 		leafs = self.nice_tree_decomposition.find_leafs()
 
-		process_count = min(6, len(leafs))
+		process_count = min(11, len(leafs))
 
 		work_queue = multiprocessing.Queue()
 		result_queue = multiprocessing.Queue()
@@ -210,12 +210,12 @@ class Algorithm:
 def worker(process_index, graph, nice_tree_decomposition, h, k, work_queue, result_queue):
 	setproctitle("Epidemic Edge Deletion Worker %d" % process_index)
 
-	this_process = psutil.Process(os.getpid())
-	hp = hpy()
+	#this_process = psutil.Process(os.getpid())
+	#hp = hpy()
 		
 	alg = AlgorithmWorker(graph, nice_tree_decomposition, h, k)
 
-	hp.setrelheap()
+	#hp.setrelheap()
 
 	(node, children, child_component_signatures) = work_queue.get()
 	while (node != None):
@@ -230,10 +230,10 @@ def worker(process_index, graph, nice_tree_decomposition, h, k, work_queue, resu
 			child_component_signatures = None
 			component_signature = None
 
-			print("[P%d] Memory usage before GC: %d" % (process_index, this_process.memory_info().rss))
-			gc.collect()
-			print("[P%d] Memory usage after GC: %d" % (process_index, this_process.memory_info().rss))
-			print("[P%d] Heap: %s" % (process_index, hp.heap()))
+			#print("[P%d] Memory usage before GC: %d" % (process_index, this_process.memory_info().rss))
+			#gc.collect()
+			#print("[P%d] Memory usage after GC: %d" % (process_index, this_process.memory_info().rss))
+			#print("[P%d] Heap: %s" % (process_index, hp.heap()))
 
 			(node, children, child_component_signatures) = work_queue.get()
 		except KeyError as e:
@@ -242,6 +242,9 @@ def worker(process_index, graph, nice_tree_decomposition, h, k, work_queue, resu
 			print("node is %r" % node)
 			print("children is %r" % children)
 			print("child_component_signatures is %r" % child_component_signatures)
+		#except KeyboardInterrupt as i:
+		#	print("[P%d] Received an interrupt, cancelling. Heap:\n%s" % (process_index, hp.heap()))
+		#	raise i
 
 class AlgorithmWorker:
 	def __init__(self, graph, nice_tree_decomposition, h, k):
@@ -436,6 +439,7 @@ class AlgorithmWorker:
 			partition_1 = P
 			partition_2 = P
 			all_function_pairs = self.get_all_function_pairs(P, c)
+			edges_connecting_blocks_in_partition = self.edges_connecting_blocks_in_partition(bag, P)
 
 			for (c_1, c_2) in all_function_pairs:
 				sigma_t1_t2_join.add(((partition_1, c_1), (partition_2, c_2)))
@@ -446,7 +450,6 @@ class AlgorithmWorker:
 				tuple_child_1 = del_values_child[(child_1, sigma_1)]
 				tuple_child_2 = del_values_child[(child_2, sigma_2)]
 
-				edges_connecting_blocks_in_partition = self.edges_connecting_blocks_in_partition(bag, P)
 				value = (tuple_child_1[1] + tuple_child_2[1] 
 						 - len(edges_connecting_blocks_in_partition))
 
@@ -710,7 +713,7 @@ class Block:
 
 	def __eq__(self, other):
 		if(isinstance(other, Block)):
-			return set(self.node_list) == set(other.node_list)
+			return self.node_list == other.node_list
 		else:
 			return False
 	
@@ -773,7 +776,7 @@ class Partition:
 
 	def __eq__(self, other):
 		if(isinstance(other, Partition)):
-			return set(self.blocks) == set(other.blocks)
+			return self.blocks == other.blocks
 		else:
 			return False
 	
@@ -781,7 +784,7 @@ class Partition:
 		return self.hash
 
 	def calculate_hash(self):
-		self.hash = hash(tuple(set(self.blocks)))
+		self.hash = hash(tuple(self.blocks))
 
 	def symmetric_difference(self, partition):
 		return set(self.blocks).symmetric_difference(set(partition.blocks))
@@ -819,12 +822,13 @@ class Function:
 			return True
 		else:
 			return False
-	
+
 	def __hash__(self):
 		return self.hash
 
 	def calculate_hash(self):
-		self.hash = hash(tuple(sorted(self.dictionary.keys()) + sorted(self.dictionary.values())))
+		#self.hash = hash(tuple(sorted(self.dictionary.keys()) + sorted(self.dictionary.values())))
+		self.hash = hash(tuple(sorted(self.dictionary.items(), key = lambda p: p[0])))
 
 	def __repr__(self):
 		return "Function(%r)" % self.dictionary
