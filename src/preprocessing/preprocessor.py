@@ -5,6 +5,8 @@ import functools
 
 import matplotlib.pyplot as plt
 
+POINT_PROXIMITY_TOLERANCE = 3
+
 class Preprocessor:
 
 	def __init__(self):
@@ -23,7 +25,7 @@ class Preprocessor:
 			district_list = [ DistrictPolygon(district)
 								for district in data_dump["features"]
 								if district.properties["type_2"] != "Water body"
-									and district.properties["name_1"] == state_filter]
+									and district.properties["name_1"] in state_filter]
 			
 
 
@@ -44,14 +46,15 @@ class Preprocessor:
 			district1 = identifier_to_district_dictionary[i]
 			name_dictionary[i] = district1.district_name
 			position_dictionary[i] = district1.polygon_coordinate
-			for j in range(identifier):
+			for j in range(i + 1, identifier):
 				district2 = identifier_to_district_dictionary[j]
-				if(not i == j and district1.do_bounding_boxes_intersect(district2)):
+				if( district1.do_bounding_boxes_intersect(district2) and district.do_districts_intersect(district2)):
 					if(not district2 in district1.neighbours):
 						district1.neighbours.append(district2)    
 					if(not district1 in district2.neighbours):
-						district2.neighbours.append(district1)			
+						district2.neighbours.append(district1)
 					district_graph.add_edge(i, j)
+			print("Finished {count} out of {max_count}".format(count = i, max_count = identifier))
 
 		maxvalue=[0,0]
 		for key in position_dictionary:
@@ -68,7 +71,7 @@ class Preprocessor:
 
 		plt.figure(num=None, figsize=(15, 15), dpi=256)
 		
-		#nx.draw_networkx_labels(district_graph,pos=position_dictionary, labels=name_dictionary,font_size=10)
+		nx.draw_networkx_labels(district_graph,pos=position_dictionary, labels=name_dictionary,font_size=10)
 		nx.draw_networkx_labels(district_graph, pos=position_dictionary, font_size=10)
 		nx.draw_networkx_nodes(district_graph, position_dictionary)
 		nx.draw_networkx_edges(district_graph, position_dictionary)
@@ -149,6 +152,52 @@ class DistrictPolygon:
 				and corner[1] >= other_bounding_box[0][1] and corner[1] <= other_bounding_box[1][1]):
 				return True
 		return False
+
+	def points_are_close(self, point1, point2, abs_tol=0.0):
+		return abs(point1[0]-point2[0]) + abs(point1[1] - point2[1]) <= abs_tol
+
+	def do_districts_intersect(self, other_district_polygon):
+		if self.geometry.type[0] == "P" and other_district_polygon.geometry.type[0] == "P":
+			for polygon_part in self.geometry.coordinates:
+				for point in polygon_part:
+					for other_polygon_part in other_district_polygon.geometry.coordinates:
+						for other_point in other_polygon_part:
+							if self.points_are_close(point, other_point, abs_tol=POINT_PROXIMITY_TOLERANCE):
+								return True
+		elif self.geometry.type[0] == "P" and other_district_polygon.geometry.type[0] == "M":
+			for polygon_part in self.geometry.coordinates:
+				for point in polygon_part:
+					for other_polygon in other_district_polygon.geometry.coordinates:
+						# account for holes in polygon
+						for other_polygon_part in other_polygon:
+							for other_point in other_polygon_part:
+								if self.points_are_close(point, other_point, abs_tol=POINT_PROXIMITY_TOLERANCE):
+									return True 
+
+		elif self.geometry.type[0] == "M" and other_district_polygon.geometry.type[0] == "P" :
+			for polygon in self.geometry.coordinates:
+				for polygon_part in self.geometry.coordinates:
+					for point in polygon_part:
+						for other_polygon_part in other_district_polygon.geometry.coordinates:
+							for other_point in other_polygon_part:
+								if self.points_are_close(point, other_point, abs_tol=POINT_PROXIMITY_TOLERANCE):
+									return True
+		elif self.geometry.type[0] == "M" and other_district_polygon.geometry.type[0] == "M":
+			for polygon in self.geometry.coordinates:
+				for polygon_part in self.geometry.coordinates:
+					for point in polygon_part:
+						for other_polygon in other_district_polygon.geometry.coordinates:
+							# account for holes in polygon
+							for other_polygon_part in other_polygon:
+								for other_point in other_polygon_part:
+									if self.points_are_close(point, other_point, abs_tol=POINT_PROXIMITY_TOLERANCE):
+										return True
+		else:
+			raise Exception("Type other than Polygon and MultiPolygon") 
+
+
+
+
 		
 	def __eq__(self, other):
 		if not isinstance(other, DistrictPolygon):

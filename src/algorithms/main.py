@@ -102,7 +102,7 @@ def interpret_result(root_node_signature, identifier_to_district_dictionary, pos
 
 if __name__ == "__main__":
 	parser = ArgumentParser(add_help=False)
-	parser.add_argument("-s", "--state")
+	parser.add_argument("-s", "--states", nargs='*')
 	parser.add_argument("-h", type=int)
 	parser.add_argument("-k", type=int)
 	parser.add_argument("--singlethreaded", action='store_true')
@@ -116,4 +116,4 @@ if __name__ == "__main__":
 		print("Error: -k paramter is required!")
 		sys.exit(1)
 
-	main(args.h, args.k, args.state, args.singlethreaded)
+	main(args.h, args.k, args.states, args.singlethreaded)
