@@ -29,14 +29,16 @@ class Algorithm:
 
 		process_count = min(11, len(leafs))
 
-		work_queue = multiprocessing.Queue()
 		result_queue = multiprocessing.Queue()
 
 		processes = []
+		work_queues = []
 		for i in range(process_count):
-			p = multiprocessing.Process(target=worker, args=(i, self.graph, self.nice_tree_decomposition, self.h, self.k, work_queue, result_queue))
+			wq = multiprocessing.Queue()
+			p = multiprocessing.Process(target=worker, args=(i, self.graph, self.nice_tree_decomposition, self.h, self.k, wq, result_queue))
 			p.start()
 			processes.append(p)
+			work_queues.append(wq)
 
 		calculated_nodes = 0
 		total_nodes = len(self.nice_tree_decomposition.graph.nodes)
@@ -44,12 +46,14 @@ class Algorithm:
 		print("Created processes, starting work")
 
 		for i in range(process_count):
-			work_queue.put((leafs.pop(-1), None, None))
+			work_queues[i].put((leafs.pop(-1), None, None))
 
 		while (calculated_nodes < total_nodes):
 			# Read a single result
-			(node, component_signature) = result_queue.get()
+			(process_index, node, component_signature) = result_queue.get()
 			
+			print("Received a result from P%d" % process_index)
+
 			#self.validate_signature(node, component_signature)
 
 			# Store the component signature for later and track that the node is done
@@ -67,9 +71,9 @@ class Algorithm:
 					else:
 						child_signatures.update(self.component_signatures[child])
 				if (can_calculate_pred):
-					self.queue_work(work_queue, pred, children, child_signatures)
+					self.queue_work(work_queues[process_index], pred, children, child_signatures)
 				elif (len(leafs) > 0):
-					self.queue_work(work_queue, leafs.pop(-1), None, None)
+					self.queue_work(work_queues[process_index], leafs.pop(-1), None, None)
 
 			# Print some intermediate status results
 			print("Calculated %d nodes so far..." % calculated_nodes)
@@ -222,7 +226,7 @@ def worker(process_index, graph, nice_tree_decomposition, h, k, work_queue, resu
 		try:
 			print ("[P%d] Worker starting %s node: %r" % (process_index, node.node_type, node))
 			component_signature = alg.calculate_component_signature_of_node(node, children, child_component_signatures)
-			result_queue.put((node, component_signature))
+			result_queue.put((process_index, node, component_signature))
 			print ("[P%d] Worker finished %s node: %r" % (process_index, node.node_type, node))
 
 			node = None
