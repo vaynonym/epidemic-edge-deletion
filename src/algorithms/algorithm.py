@@ -33,22 +33,23 @@ class Algorithm:
 
 		processes = []
 		work_queues = []
+		calculated_nodes = multiprocessing.Value('i', 0)
+
+		total_nodes = len(self.nice_tree_decomposition.graph.nodes)
+
 		for i in range(process_count):
 			wq = multiprocessing.Queue()
-			p = multiprocessing.Process(target=worker, args=(i, self.graph, self.nice_tree_decomposition, self.h, self.k, wq, result_queue))
+			p = multiprocessing.Process(target=worker, args=(i, self.graph, self.nice_tree_decomposition, self.h, self.k, wq, result_queue, calculated_nodes, total_nodes))
 			p.start()
 			processes.append(p)
 			work_queues.append(wq)
 
-		calculated_nodes = 0
-		total_nodes = len(self.nice_tree_decomposition.graph.nodes)
-
 		print("Created processes, starting work")
 
 		for i in range(process_count):
-			work_queues[i].put((leafs.pop(-1), None, None))
+			self.queue_node_and_preds(work_queues[i], leafs.pop(-1))
 
-		while (calculated_nodes < total_nodes):
+		while (calculated_nodes.value < total_nodes):
 			# Read a single result
 			(process_index, node, component_signature) = result_queue.get()
 			
@@ -58,28 +59,30 @@ class Algorithm:
 
 			# Store the component signature for later and track that the node is done
 			self.component_signatures[node] = component_signature
-			calculated_nodes += 1
+
 			# Find all nodes which are now calculable because this one is done and queue them
 			predecessors = self.nice_tree_decomposition.predecessors(node)
 			for pred in predecessors:
 				can_calculate_pred = True
 				child_signatures = dict()
 				children = list(self.nice_tree_decomposition.successors(pred))
+
 				for child in children:
 					if (not child in self.component_signatures.keys()):
 						can_calculate_pred = False
 					else:
 						child_signatures.update(self.component_signatures[child])
+
 				if (can_calculate_pred):
-					self.queue_work(work_queues[process_index], pred, children, child_signatures)
+					self.queue_node_and_preds(work_queues[process_index], pred, children, child_signatures)
 				elif (len(leafs) > 0):
-					self.queue_work(work_queues[process_index], leafs.pop(-1), None, None)
+					self.queue_node_and_preds(work_queues[process_index], leafs.pop(-1))
 
 			# Print some intermediate status results
-			print("Calculated %d nodes so far..." % calculated_nodes)
+			print("Calculated %d nodes so far..." % calculated_nodes.value)
 
-		for p in processes:
-			work_queue.put((None, None, None))
+		for i in range(process_count):
+			work_queues[i].put((None, None, None, False))
 
 		for p in processes:
 			p.join()
@@ -102,6 +105,7 @@ class Algorithm:
 			(node, children, child_component_signatures) = calculatable_nodes.pop(-1)
 
 			print ("Starting %s node: %r" % (node.node_type, node))
+
 			component_signature = algWorker.calculate_component_signature_of_node(node, children, child_component_signatures)
 
 			#self.validate_signature(node, component_signature)
@@ -131,14 +135,24 @@ class Algorithm:
 
 		return self.component_signatures[self.root]
 
-	def queue_work(self, work_queue, node, children, child_signatures):
-		work_queue.put((node, children, child_signatures))
+	def queue_node_and_preds(self, work_queue, node, initial_children = None, initial_signature = None):
+		if (initial_children != None):
+			for child in initial_children:
+				del self.component_signatures[child]
 
-		if (children == None):
-			 return
+		predecessors = list(self.nice_tree_decomposition.predecessors(node))
+		if (predecessors == None or len(predecessors) == 0):
+			work_queue.put((node, initial_children, initial_signature, False))
+			return
 
-		for child in children:
-			del self.component_signatures[child]
+		pred = predecessors[0]
+
+		if pred.node_type != ntd.Nice_Tree_Node.JOIN:
+			work_queue.put((node, initial_children, initial_signature, True))
+			self.queue_node_and_preds(work_queue, pred)
+		else:
+			work_queue.put((node, initial_children, initial_signature, False))
+
 
 	def queue_work_singlethreaded(self, calculatable_nodes, node, children, child_signatures):
 		calculatable_nodes.append((node, children, child_signatures))
@@ -211,7 +225,7 @@ class Algorithm:
 		
 		return True
 
-def worker(process_index, graph, nice_tree_decomposition, h, k, work_queue, result_queue):
+def worker(process_index, graph, nice_tree_decomposition, h, k, work_queue, result_queue, calculated_nodes, total_nodes):
 	setproctitle("Epidemic Edge Deletion Worker %d" % process_index)
 
 	#this_process = psutil.Process(os.getpid())
@@ -221,31 +235,46 @@ def worker(process_index, graph, nice_tree_decomposition, h, k, work_queue, resu
 
 	#hp.setrelheap()
 
-	(node, children, child_component_signatures) = work_queue.get()
+	(node, _, _, has_more_in_branch) = work_queue.get()
+	last_comp_signature = None
+	last_node = None
 	while (node != None):
 		try:
-			print ("[P%d] Worker starting %s node: %r" % (process_index, node.node_type, node))
-			component_signature = alg.calculate_component_signature_of_node(node, children, child_component_signatures)
-			result_queue.put((process_index, node, component_signature))
-			print ("[P%d] Worker finished %s node: %r" % (process_index, node.node_type, node))
+			print ("[P%d] Worker starting %s node (%d/%d): %r" % (process_index, node.node_type, calculated_nodes.value + 1, total_nodes, node))
 
-			node = None
-			children = None
-			child_component_signatures = None
-			component_signature = None
+			if (node.node_type == ntd.Nice_Tree_Node.JOIN):
+				last_comp_signature = alg.calculate_component_signature_of_node(node, join_children, join_signatures)
+			else:
+				last_comp_signature = alg.calculate_component_signature_of_node(node, [last_node], last_comp_signature)
+
+			last_node = node
+
+			with calculated_nodes.get_lock():
+				calculated_nodes.value += 1
+
+			if (not has_more_in_branch):
+				result_queue.put((process_index, node, last_comp_signature))
+
+			(node, join_children, join_signatures, has_more_in_branch) = work_queue.get()
+
+			#result_queue.put((process_index, node, component_signature))
+			#print ("[P%d] Worker finished %s node: %r" % (process_index, node.node_type, node))
+
+			#node = None
+			#children = None
+			#child_component_signatures = None
+			#component_signature = None
 
 			#print("[P%d] Memory usage before GC: %d" % (process_index, this_process.memory_info().rss))
 			#gc.collect()
 			#print("[P%d] Memory usage after GC: %d" % (process_index, this_process.memory_info().rss))
 			#print("[P%d] Heap: %s" % (process_index, hp.heap()))
-
-			(node, children, child_component_signatures) = work_queue.get()
 		except KeyError as e:
 			print("\n====================\nEncountered error: %s" % e)
 			print("Traceback: %s" % traceback.format_exc())
 			print("node is %r" % node)
-			print("children is %r" % children)
-			print("child_component_signatures is %r" % child_component_signatures)
+			print("children is %r" % (join_children if node.node_type == ntd.Nice_Tree_Node.JOIN else [last_node]))
+			print("child_component_signatures is %r" % (join_signatures if node.node_type == ntd.Nice_Tree_Node.JOIN else last_comp_signature))
 		#except KeyboardInterrupt as i:
 		#	print("[P%d] Received an interrupt, cancelling. Heap:\n%s" % (process_index, hp.heap()))
 		#	raise i
