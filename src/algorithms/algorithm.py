@@ -13,6 +13,9 @@ from setproctitle import setproctitle
 
 from guppy import hpy
 
+# TODO: Improvement ideas
+# - Cancel as soon as any node doesn't have any valid state anymore
+
 class Algorithm:
 	
 	def __init__(self, graph, nice_tree_decomposition, h, k):
@@ -304,15 +307,11 @@ class AlgorithmWorker:
 
 
 	def generate_possible_component_states_of_bag(self, bag, h):
-		states = set()
-		all_partitions = self.generate_partitions_of_bag_of_size(bag, h)
-		for partition in all_partitions:
+		for partition in self.generate_partitions_of_bag_of_size(bag, h):
 			all_functions = self.generate_all_functions_from_partition_to_range(partition, h)
 			for function in all_functions:
-				states.add( (partition, function))
+				yield (partition, function)
 
-		return states
-			
 	def generate_partitions_of_bag_of_size(self, bag, size):
 		partitions = set()
 		initial_partition = Partition([])
@@ -423,10 +422,7 @@ class AlgorithmWorker:
 	# Algorithm 2
 	def find_component_signatures_of_leaf_nodes(self, leaf_node, bag):
 		del_values = dict()
-		all_states = self.generate_possible_component_states_of_bag(bag, self.h)
-		for i in range(0, len(all_states)):
-			(P, c) = all_states.pop()
-
+		for (P, c) in self.generate_possible_component_states_of_bag(bag, self.h):
 			potential_edges_to_remove = set()
 
 			potential_edges_to_remove.update(self.edges_connecting_blocks_in_partition(bag, P))
@@ -445,7 +441,6 @@ class AlgorithmWorker:
 	# Algorithm 3
 	def calculate_component_signature_of_introduce_node(self, introduce_node, bag, child, child_bag, del_values_child):
 		del_Values = dict()
-		all_States = self.generate_possible_component_states_of_bag(bag, self.h)
 
 		# v is a set containing the node
 		v = bag.symmetric_difference(child_bag)
@@ -453,9 +448,7 @@ class AlgorithmWorker:
 		v = list(v)[0]
 		block_containing_v = set()
 
-		for i in range(0, len(all_States)):
-			state = all_States.pop()
-
+		for state in self.generate_possible_component_states_of_bag(bag, self.h):
 			introduce_inhereted_cStates = set()
 
 			# find block containing v
@@ -499,11 +492,7 @@ class AlgorithmWorker:
 	# Algorithm 5
 	def find_component_signatures_of_join_nodes(self, join_node, bag, child_1, child_2, del_values_child):
 		del_values = dict()
-		all_states = self.generate_possible_component_states_of_bag(bag, self.h)
-
-		for i in range(0, len(all_states)):
-			(P, c) = all_states.pop()
-
+		for (P, c) in self.generate_possible_component_states_of_bag(bag, self.h):
 			sigma_t1_t2_join = set()
 			partition_1 = P
 			partition_2 = P
@@ -641,13 +630,16 @@ class AlgorithmWorker:
 		inserted_blocks = set()
 		for block in refinement:
 
+			new_all_functions = set()
 			for function in all_functions:
 
 				sum_of_refinement_blocks_currently_assigned = 0
-				for inserted_block in inserted_blocks:
-					sum_of_refinement_blocks_currently_assigned += function[inserted_block]
-
-				new_all_functions = set()
+				min_size_of_refinement_blocks_currently_unassigned = 0
+				for block_r in refinement:
+					if (block_r in inserted_blocks):
+						sum_of_refinement_blocks_currently_assigned += function[block_r]
+					else:
+						min_size_of_refinement_blocks_currently_unassigned += len(block_r)
 
 				# if block is the last block then its value is the remainder
 				if len(refinement) - len(inserted_blocks) == 1:
@@ -657,7 +649,7 @@ class AlgorithmWorker:
 
 				# - len(refinement.symmetric_difference(inserted_blocks)) is necassary because every c'(block)>=1
 				else:
-					for value in range(len(block), c_of_block_containing_v - 1 - sum_of_refinement_blocks_currently_assigned - len(set(refinement.blocks).symmetric_difference(inserted_blocks))):
+					for value in range(len(block), c_of_block_containing_v - 1 - sum_of_refinement_blocks_currently_assigned - len(set(refinement.blocks).symmetric_difference(inserted_blocks)) - min_size_of_refinement_blocks_currently_unassigned):
 						new_function = Function(dict(function.dictionary))
 						new_function[block] = value
 						new_all_functions.add(new_function)
@@ -670,7 +662,6 @@ class AlgorithmWorker:
 	# Algorithm 4
 	def find_component_signatures_of_forget_node(self, node, child_node, del_values_child):
 		del_values = dict()
-		all_states = self.generate_possible_component_states_of_bag(node.bag, self.h)
 
 		child_extra_nodes = child_node.bag - node.bag
 		if (len(child_extra_nodes) != 1):
@@ -678,8 +669,7 @@ class AlgorithmWorker:
 
 		(v,) = child_extra_nodes
 
-		for i in range(0, len(all_states)):
-			state = all_states.pop()
+		for state in self.generate_possible_component_states_of_bag(node.bag, self.h):
 			P = state[0]
 			c = state[1]
 
