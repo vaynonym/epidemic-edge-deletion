@@ -30,7 +30,7 @@ class Algorithm:
 		self.root = self.nice_tree_decomposition.root
 		leafs = self.nice_tree_decomposition.find_leafs()
 
-		process_count = min(4, len(leafs))
+		process_count = min(2, len(leafs))
 
 		result_queue = multiprocessing.Queue()
 
@@ -310,6 +310,68 @@ class AlgorithmWorker:
 		for partition in self.generate_partitions_of_bag_of_size(bag, h):
 			for function in self.generate_all_functions_from_partition_to_range(partition, h):
 				yield (partition, function)
+
+	# Generates all partitions of 'bag' consisting of blocks of size at most 'size'.
+	def generate_partitions_of_bag_of_size_2(self, bag, size):
+		bag = list(bag)
+		n = len(bag)
+
+		# This ultimately generates all possible partitions, just discarding those
+		# not meeting the size constraints.
+
+		current_partition = [1] * n
+		max_tracker = [0] + [1] * (n-1)
+
+		while True:
+			# Build a Partition object out of current_partition and yield it
+			# if it satifies the block size constraint.
+			block_index = 1
+			block_size = 0
+			block = []
+			partition = []
+			skip_partition = False
+			for i in range(n):
+				if (current_partition[i] != block_index):
+					partition.append(Block(block))
+					block = []
+					block_index = current_partition[i]
+					block_size = 0
+
+				if (block_size == size):
+					skip_partition = True
+					break
+
+				block.append(bag[i])
+				block_size += 1
+
+				if (i == n - 1):
+					partition.append(Block(block))
+
+
+			if (not skip_partition):
+				yield Partition(partition)
+
+			# Transform current_partition into the next possible partition
+
+			# Find first incrementable position
+			for i in range(n - 1, -1, -1):
+				# Is current_partition[i] incrementable?
+				is_incrementable = current_partition[i] < n and current_partition[i] <= max_tracker[i]
+				if (is_incrementable):
+					break
+
+			# current_partition[0] is never incrementable, so if the loop reached 0, nothing is incrementable anymore
+			if (i == 0):
+				break
+
+			# Otherwise, we found the rightmost incrementable position.
+			# Increment it and set everything right of it back to 1
+			current_partition[i] += 1
+			max_tracker[i] = max(current_partition[i-1], max_tracker[i-1])
+			for j in range(i + 1, n):
+				current_partition[j] = 1
+				max_tracker[j] = max(current_partition[j-1], max_tracker[j-1])
+
 
 	def generate_partitions_of_bag_of_size(self, bag, size):
 		partitions = set()
