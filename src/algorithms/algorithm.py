@@ -229,13 +229,13 @@ def worker(process_index, graph, nice_tree_decomposition, h, k, work_queue, resu
 	setproctitle("Epidemic Edge Deletion Worker %d" % process_index)
 
 	#this_process = psutil.Process(os.getpid())
-	#hp = hpy()
+	hp = hpy()
 		
 	alg = AlgorithmWorker(graph, nice_tree_decomposition, h, k)
 
 	#hp.setrelheap()
 
-	(node, _, _, has_more_in_branch) = work_queue.get()
+	(node, join_children, join_signatures, has_more_in_branch) = work_queue.get()
 	last_comp_signature = None
 	last_node = None
 	while (node != None):
@@ -255,29 +255,27 @@ def worker(process_index, graph, nice_tree_decomposition, h, k, work_queue, resu
 			if (not has_more_in_branch):
 				result_queue.put((process_index, node, last_comp_signature))
 
-			(node, join_children, join_signatures, has_more_in_branch) = work_queue.get()
-
 			#result_queue.put((process_index, node, component_signature))
 			#print ("[P%d] Worker finished %s node: %r" % (process_index, node.node_type, node))
-
-			#node = None
-			#children = None
-			#child_component_signatures = None
-			#component_signature = None
 
 			#print("[P%d] Memory usage before GC: %d" % (process_index, this_process.memory_info().rss))
 			#gc.collect()
 			#print("[P%d] Memory usage after GC: %d" % (process_index, this_process.memory_info().rss))
 			#print("[P%d] Heap: %s" % (process_index, hp.heap()))
+
+			(node, join_children, join_signatures, has_more_in_branch) = work_queue.get()
+
 		except KeyError as e:
 			print("\n====================\nEncountered error: %s" % e)
 			print("Traceback: %s" % traceback.format_exc())
 			print("node is %r" % node)
 			print("children is %r" % (join_children if node.node_type == ntd.Nice_Tree_Node.JOIN else [last_node]))
 			print("child_component_signatures is %r" % (join_signatures if node.node_type == ntd.Nice_Tree_Node.JOIN else last_comp_signature))
-		#except KeyboardInterrupt as i:
-		#	print("[P%d] Received an interrupt, cancelling. Heap:\n%s" % (process_index, hp.heap()))
-		#	raise i
+		except KeyboardInterrupt as i:
+			print("[P%d] Received an interrupt, cancelling." % (process_index,))
+			if (process_index == 2):
+				ForkablePdb().set_trace()
+			raise i
 
 class AlgorithmWorker:
 	def __init__(self, graph, nice_tree_decomposition, h, k):
@@ -395,7 +393,9 @@ class AlgorithmWorker:
 	def find_component_signatures_of_leaf_nodes(self, leaf_node, bag):
 		del_values = dict()
 		all_states = self.generate_possible_component_states_of_bag(bag, self.h)
-		for (P, c) in all_states:
+		for i in range(0, len(all_states)):
+			(P, c) = all_states.pop()
+
 			potential_edges_to_remove = set()
 
 			potential_edges_to_remove.update(self.edges_connecting_blocks_in_partition(bag, P))
@@ -422,7 +422,9 @@ class AlgorithmWorker:
 		v = list(v)[0]
 		block_containing_v = set()
 
-		for state in all_States:
+		for i in range(0, len(all_States)):
+			state = all_States.pop()
+
 			introduce_inhereted_cStates = set()
 
 			# find block containing v
@@ -467,7 +469,10 @@ class AlgorithmWorker:
 	def find_component_signatures_of_join_nodes(self, join_node, bag, child_1, child_2, del_values_child):
 		del_values = dict()
 		all_states = self.generate_possible_component_states_of_bag(bag, self.h)
-		for (P, c) in all_states:
+
+		for i in range(0, len(all_states)):
+			(P, c) = all_states.pop()
+
 			sigma_t1_t2_join = set()
 			partition_1 = P
 			partition_2 = P
@@ -642,7 +647,8 @@ class AlgorithmWorker:
 
 		(v,) = child_extra_nodes
 
-		for state in all_states:
+		for i in range(0, len(all_states)):
+			state = all_states.pop()
 			P = state[0]
 			c = state[1]
 
@@ -715,6 +721,8 @@ class AlgorithmWorker:
 
 # We need a wrapper class in order to have hashable lists for the set of Partitions
 class Block:
+	__slots__ = ('node_list', 'hash')
+
 	def __init__(self, node_list):
 		self.node_list = sorted(node_list)
 		self.hash = None
@@ -769,6 +777,8 @@ class Block:
 		return set(self.node_list).symmetric_difference(set(block.node_list))
 
 class Partition:
+	__slots__ = ('blocks', 'hash')
+
 	def __init__(self, blocks):
 		self.blocks = sorted(blocks)
 		self.hash = None
@@ -827,6 +837,8 @@ class Partition:
 
 
 class Function:
+	__slots__ = ('dictionary', 'hash')
+
 	def __init__(self, dictionary):
 		self.dictionary = dictionary
 		self.hash = None
@@ -886,3 +898,25 @@ class HashableDictionary(dict):
 		return hash(self.__key())
 	def __eq__(self, other):
 		return self.__key() == other.__key()
+
+
+
+import pdb
+
+class ForkablePdb(pdb.Pdb):
+
+	_original_stdin_fd = sys.stdin.fileno()
+	_original_stdin = None
+
+	def __init__(self):
+		pdb.Pdb.__init__(self, nosigint=True)
+
+	def _cmdloop(self):
+		current_stdin = sys.stdin
+		try:
+			if not self._original_stdin:
+				self._original_stdin = os.fdopen(self._original_stdin_fd)
+			sys.stdin = self._original_stdin
+			self.cmdloop()
+		finally:
+			sys.stdin = current_stdin
