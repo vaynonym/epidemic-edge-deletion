@@ -18,7 +18,7 @@ def print_graph(graph, filename, planar):
 
 	plt.savefig(filename)
 
-def main(h, k, state_filter, singlethreaded):
+def main(h, k, state_filter, load_flag, singlethreaded):
 
 	print("  __________________________")
 	print(" /		            \\")
@@ -33,7 +33,7 @@ def main(h, k, state_filter, singlethreaded):
 	print()
 
 	preprocessor = prepro.Preprocessor()
-	graph, identifier_to_district_dictionary, position_dictionary, name_dictionary = preprocessor.load_data(state_filter)
+	graph, identifier_to_district_dictionary, position_dictionary, name_dictionary = preprocessor.load_data(state_filter, load_flag)
 
 	print("District graph has %d nodes and %d edges." % ((len(graph.nodes), len(graph.edges))))
 
@@ -105,6 +105,7 @@ if __name__ == "__main__":
 	parser.add_argument("-s", "--states", nargs='*')
 	parser.add_argument("-h", type=int)
 	parser.add_argument("-k", type=int)
+	parser.add_argument("--load", action='store_true')
 	parser.add_argument("--singlethreaded", action='store_true')
 	args = parser.parse_args()
 
@@ -116,4 +117,4 @@ if __name__ == "__main__":
 		print("Error: -k paramter is required!")
 		sys.exit(1)
 
-	main(args.h, args.k, args.states, args.singlethreaded)
+	main(args.h, args.k, args.states, args.load, args.singlethreaded)

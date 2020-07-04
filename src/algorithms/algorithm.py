@@ -27,7 +27,7 @@ class Algorithm:
 		self.root = self.nice_tree_decomposition.root
 		leafs = self.nice_tree_decomposition.find_leafs()
 
-		process_count = min(11, len(leafs))
+		process_count = min(4, len(leafs))
 
 		result_queue = multiprocessing.Queue()
 
@@ -366,30 +366,61 @@ class AlgorithmWorker:
 		return partitions
 
 	# a function here is just a dictionary that maps its unique inputs values to output values
-	def generate_all_functions_from_partition_to_range(self, partition, h):
-		all_functions = set()
-		all_functions.add(Function({})) # initial set of undefined functions used to generate the rest
+	# def generate_all_functions_from_partition_to_range(self, partition, h):
+	# 	all_functions = set()
+	# 	all_functions.add(Function({})) # initial set of undefined functions used to generate the rest
 
-		# partially define function by setting the mapping for each block
-		for block in partition:
+	# 	# partially define function by setting the mapping for each block
+	# 	for block in partition:
 
-			# for each possible value that a block could be mapped to
-			new_all_functions = []
-			for codomain_value in range(1, h+1):
-				# if that value is legal
-				if codomain_value >= len(block):
-					# then for each function that already exists
-					for function in all_functions:
-						# create a new function with the only difference being
-						# that the new block now has a mapping in that function
+	# 		# for each possible value that a block could be mapped to
+	# 		new_all_functions = []
+	# 		for codomain_value in range(len(block), h+1):
+	# 			# then for each function that already exists
+	# 			for function in all_functions:
+	# 				# create a new function with the only difference being
+	# 				# that the new block now has a mapping in that function
 
-						new_function = Function(dict(function.dictionary))
-						new_function[block] = codomain_value
-						new_all_functions.append(new_function)
+	# 				new_function = Function(dict(function.dictionary))
+	# 				new_function[block] = codomain_value
+	# 				if(codomain_value == h):
+	# 					yield new_function
+	# 				else {
+	# 					new_all_functions.append(new_function)
+	# 				}
 			
-			all_functions = new_all_functions
+	# 		all_functions = new_all_functions
 
-		return all_functions
+	# 	return all_functions
+
+	def generate_all_functions_from_partition_to_range(self, partition, h):
+		min_Values_Of_Blocks = []
+		for block in partition:
+			min_Values_Of_Blocks.append(len(block))
+		
+		current_Values_Of_Blocks = list(min_Values_Of_Blocks)
+
+		last_Values_Of_Blocks = [h] * len(partition)
+
+		while(not current_Values_Of_Blocks == last_Values_Of_Blocks):
+			function = dict()
+			for i in range(len(partition)):
+				function[partition[i]] = current_Values_Of_Blocks[i]
+			yield Function(function)
+
+			for i in range(len(current_Values_Of_Blocks)):
+				if(not current_Values_Of_Blocks[i] == h):
+					current_Values_Of_Blocks[i] += 1
+					for j in range(i):
+						current_Values_Of_Blocks[j] = min_Values_Of_Blocks[j]
+					break
+		
+		function = dict()
+		for i in range(len(partition)):
+			function[partition[i]] = current_Values_Of_Blocks[i]
+		yield Function(function)
+		
+
 
 	# Algorithm 2
 	def find_component_signatures_of_leaf_nodes(self, leaf_node, bag):
