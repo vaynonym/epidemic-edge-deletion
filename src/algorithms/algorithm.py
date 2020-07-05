@@ -308,8 +308,7 @@ class AlgorithmWorker:
 
 	def generate_possible_component_states_of_bag(self, bag, h):
 		for partition in self.generate_partitions_of_bag_of_size(bag, h):
-			all_functions = self.generate_all_functions_from_partition_to_range(partition, h)
-			for function in all_functions:
+			for function in self.generate_all_functions_from_partition_to_range(partition, h):
 				yield (partition, function)
 
 	def generate_partitions_of_bag_of_size(self, bag, size):

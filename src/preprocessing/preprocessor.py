@@ -3,12 +3,16 @@ import geojson
 import copy
 import functools
 import os.path
+import csv
+import datetime
+from numpy.random import normal as normal
 
 
 
 import matplotlib.pyplot as plt
 
-POINT_PROXIMITY_TOLERANCE = 0
+POINT_PROXIMITY_TOLERANCE = 0.5
+CUT_OFF_THRESHOLD = 25
 
 FILE_BASE_NAME = "data/graph"
 
@@ -40,6 +44,7 @@ class Preprocessor:
 		position_dictionary = dict()
 
 		identifier_to_district_dictionary = dict()
+		ID_to_district_dictionary = dict()
 		identifier = 0
 		graph_file_name = ""
 		if state_filter:
@@ -49,9 +54,31 @@ class Preprocessor:
 
 		for district in district_list:
 			identifier_to_district_dictionary[identifier] = district
+			ID_to_district_dictionary[district.district_ID] = district
 			identifier += 1
 		
-	
+		with open("data/RKI_COVID19_filtered.csv") as csvfile:
+			csvreader = csv.reader(csvfile)
+			next(csvreader)
+
+			first_date = datetime.datetime.strptime("9999/12/31", "%Y/%m/%d").date()
+			for row in csvreader:
+				date = datetime.datetime.strptime(row[2], "%Y/%m/%d").date()
+				if date < first_date:
+					first_date = date
+			
+			print(first_date)
+			# reset to beginning of file
+			csvfile.seek(0)
+			next(csvreader)
+			last_date = first_date + datetime.timedelta(days=45)
+			total_cases_in_timeframe = 0
+			for row in csvreader:
+				date = datetime.datetime.strptime(row[2], "%Y/%m/%d").date()
+				if date <= last_date:
+					ID_to_district_dictionary[row[3]].number_of_cases += int(row[1]) 
+					total_cases_in_timeframe += int(row[1])
+			print("Total cases within the timespan: {}".format(total_cases_in_timeframe))
 
 		if os.path.exists(graph_file_name) and load_flag:
 			district_graph = load(graph_file_name)
@@ -72,9 +99,14 @@ class Preprocessor:
 						#	district1.neighbours.append(district2)    
 						#if(not district1 in district2.neighbours):
 						#	district2.neighbours.append(district1)
-						district_graph.add_edge(i, j)
+						if(district1.number_of_cases >= normal(25, 10)):
+							district_graph.add_edge(i, j)
 				print("Finished {count} out of {max_count}".format(count = i, max_count = identifier))
-				save(district_graph, graph_file_name)
+			save(district_graph, graph_file_name)
+
+			
+			
+		district_graph.remove_nodes_from(list(nx.isolates(district_graph)))
 
 		maxvalue=[0,0]
 		for key in position_dictionary:
@@ -111,9 +143,10 @@ def load(fname):
 class DistrictPolygon:
 	def __init__(self, district):
 		self.id = int(district.properties["cca_2"], 10)
-		self.district_name = district.properties["name_2"]
+		self.district_name = "LK " + district.properties["name_2"] if district.properties["type_2"] == "Landkreis" or district.properties["type_2"] == "Kreis" else "KS " + district.properties["name_2"]
 		self.state_name = district.properties["name_1"]
-		
+		self.district_ID = district.properties["cca_2"]
+		self.number_of_cases = 0
 		self.polygon_coordinate = district.properties["geo_point_2d"]
 		self.polygon_coordinate.reverse() # for some reason the coordinates here seem reversed from all the others...?
 		self.geometry = district.geometry
