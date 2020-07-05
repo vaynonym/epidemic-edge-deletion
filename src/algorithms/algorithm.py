@@ -478,7 +478,7 @@ class AlgorithmWorker:
 			partition_without_block_containing_v = Partition(list(P.symmetric_difference(Partition([block_containing_v]))))
 
 			block_without_v = Block(block_containing_v.symmetric_difference(Block([v])))
-			refinements = self.generate_partitions_of_bag_of_size(block_without_v, len(block_without_v))
+			refinements = set(self.generate_partitions_of_bag_of_size(block_without_v, len(block_without_v)))
 
 			for c in self.generate_all_functions_from_partition_to_range(P, self.h):
 				introduce_inhereted_cStates = set()
