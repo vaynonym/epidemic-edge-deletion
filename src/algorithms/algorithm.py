@@ -30,7 +30,7 @@ class Algorithm:
 		self.root = self.nice_tree_decomposition.root
 		leafs = self.nice_tree_decomposition.find_leafs()
 
-		process_count = min(11, len(leafs))
+		process_count = min(3, len(leafs))
 
 		result_queue = multiprocessing.Queue()
 
