@@ -370,7 +370,7 @@ class AlgorithmWorker:
 
 		last_Values_Of_Blocks = [h] * len(partition)
 
-		while(not current_Values_Of_Blocks == last_Values_Of_Blocks):
+		while not current_Values_Of_Blocks == last_Values_Of_Blocks:
 			function = dict()
 			for i in range(len(partition)):
 				function[partition[i]] = current_Values_Of_Blocks[i]
@@ -399,9 +399,9 @@ class AlgorithmWorker:
 			if(len(potential_edges_to_remove) <= self.k):
 				for c in self.generate_all_functions_from_partition_to_range(P, self.h):
 					del_values[(leaf_node, (P, c))] = (potential_edges_to_remove, len(potential_edges_to_remove))
-			else:
-				for c in self.generate_all_functions_from_partition_to_range(P, self.h):
-					del_values[(leaf_node, (P, c))] = (set(), math.inf)
+			#else:
+			#	for c in self.generate_all_functions_from_partition_to_range(P, self.h):
+			#		del_values[(leaf_node, (P, c))] = (set(), math.inf)
 		
 		return del_values
 
@@ -442,7 +442,8 @@ class AlgorithmWorker:
 				for state_prime in introduce_inhereted_cStates:
 					# unsure whether state should be state_prime or not (paper says state)
 					edge_set = self.edges_connecting_node_with_other_block_in_partition(v, bag, P)
-					child_del = del_values_child[(child, state_prime)]
+					#child_del = del_values_child[(child, state_prime)]
+					child_del = del_values_child.get((child, state_prime), (set(), math.inf))
 					value = child_del[1] + len(edge_set)
 					if value < minValue:
 						minValue = value
@@ -454,8 +455,8 @@ class AlgorithmWorker:
 
 				if minValue <= self.k:
 					del_Values[(introduce_node, (P, c))] = (minValue_edge_set, minValue)
-				else:
-					del_Values[(introduce_node, (P, c))] = (set(), math.inf)
+				#else:
+				#	del_Values[(introduce_node, (P, c))] = (set(), math.inf)
 		return del_Values
 
 	# Algorithm 5
@@ -476,21 +477,11 @@ class AlgorithmWorker:
 				minValue = math.inf
 				minValueSet = set()
 				for (sigma_1, sigma_2) in sigma_t1_t2_join:
-					tuple_child_1 = del_values_child[(child_1, sigma_1)]
-					tuple_child_2 = del_values_child[(child_2, sigma_2)]
+					tuple_child_1 = del_values_child.get((child_1, sigma_1), (set(), math.inf))
+					tuple_child_2 = del_values_child.get((child_2, sigma_2), (set(), math.inf))
 
 					value = (tuple_child_1[1] + tuple_child_2[1] 
 							- len(edges_connecting_blocks_in_partition))
-
-					if (value == -1):
-						print("\n___________________________________\n")
-						print("Found a -1 value!")
-						print("Node: %r" % join_node)
-						print("Child1: %r" % child_1)
-						print("tuple1:{}".format(tuple_child_1))
-						print("Child2: %r" % child_2)
-						print("tuple2: {}".format(tuple_child_2))
-						print("edges_connecting: %r" % edges_connecting_blocks_in_partition)
 
 					if(value < minValue):
 						minValue = value
@@ -500,8 +491,8 @@ class AlgorithmWorker:
 
 				if(minValue <= self.k):
 					del_values[join_node, (P, c)] = (minValueSet, minValue)
-				else:
-					del_values[join_node, (P, c)] = (set(), math.inf)
+				#else:
+				#	del_values[join_node, (P, c)] = (set(), math.inf)
 
 		return del_values
 
@@ -681,14 +672,16 @@ class AlgorithmWorker:
 				min_value = math.inf
 				min_set = set()
 				for sigma in child_forget_inherited_states:
-					(val_set, val) = del_values_child[(child_node, sigma)]
+					#(val_set, val) = del_values_child[(child_node, sigma)]
+					(val_set, val) = del_values_child.get((child_node, sigma), (set(), math.inf))
+
 					if val < min_value:
 						min_value = val
 						min_set = val_set
 				if min_value <= self.k:
 					del_values[(node, (P, c))] = (min_set, min_value)
-				else:
-					del_values[(node, (P, c))] = (set(), math.inf)
+				#else:
+				#	del_values[(node, (P, c))] = (set(), math.inf)
 		return del_values
 
 	def get_all_extended_partitions(self, partition, new_node):

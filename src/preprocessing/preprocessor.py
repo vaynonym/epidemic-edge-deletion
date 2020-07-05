@@ -76,8 +76,9 @@ class Preprocessor:
 			for row in csvreader:
 				date = datetime.datetime.strptime(row[2], "%Y/%m/%d").date()
 				if date <= last_date:
-					ID_to_district_dictionary[row[3]].number_of_cases += int(row[1]) 
-					total_cases_in_timeframe += int(row[1])
+					if (row[3] in ID_to_district_dictionary):
+						ID_to_district_dictionary[row[3]].number_of_cases += int(row[1]) 
+						total_cases_in_timeframe += int(row[1])
 			print("Total cases within the timespan: {}".format(total_cases_in_timeframe))
 
 		if os.path.exists(graph_file_name) and load_flag:
