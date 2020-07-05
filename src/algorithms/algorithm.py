@@ -362,34 +362,6 @@ class AlgorithmWorker:
 
 		return partitions
 
-	# a function here is just a dictionary that maps its unique inputs values to output values
-	# def generate_all_functions_from_partition_to_range(self, partition, h):
-	# 	all_functions = set()
-	# 	all_functions.add(Function({})) # initial set of undefined functions used to generate the rest
-
-	# 	# partially define function by setting the mapping for each block
-	# 	for block in partition:
-
-	# 		# for each possible value that a block could be mapped to
-	# 		new_all_functions = []
-	# 		for codomain_value in range(len(block), h+1):
-	# 			# then for each function that already exists
-	# 			for function in all_functions:
-	# 				# create a new function with the only difference being
-	# 				# that the new block now has a mapping in that function
-
-	# 				new_function = Function(dict(function.dictionary))
-	# 				new_function[block] = codomain_value
-	# 				if(codomain_value == h):
-	# 					yield new_function
-	# 				else {
-	# 					new_all_functions.append(new_function)
-	# 				}
-			
-	# 		all_functions = new_all_functions
-
-	# 	return all_functions
-
 	def generate_all_functions_from_partition_to_range(self, partition, h):
 		min_Values_Of_Blocks = []
 		for block in partition:
@@ -422,19 +394,15 @@ class AlgorithmWorker:
 	# Algorithm 2
 	def find_component_signatures_of_leaf_nodes(self, leaf_node, bag):
 		del_values = dict()
-		for (P, c) in self.generate_possible_component_states_of_bag(bag, self.h):
-			potential_edges_to_remove = set()
-
-			potential_edges_to_remove.update(self.edges_connecting_blocks_in_partition(bag, P))
+		for P in self.generate_partitions_of_bag_of_size(bag, self.h):
+			potential_edges_to_remove = self.edges_connecting_blocks_in_partition(bag, P)
 			
-			# for now I'm saving the del-values themselves because we'll probably need them
-			# for the algorithm as suggested by the paper, the second value of the tuple is what we need
 			if(len(potential_edges_to_remove) <= self.k):
-				del_values[(leaf_node, (P, c))] = (potential_edges_to_remove, len(potential_edges_to_remove))
+				for c in self.generate_all_functions_from_partition_to_range(P, self.h):
+					del_values[(leaf_node, (P, c))] = (potential_edges_to_remove, len(potential_edges_to_remove))
 			else:
-				# in this case, there should be no need to save the actual set of edges
-				# so I'm leaving it as an empty set for performance reasons
-				del_values[(leaf_node, (P, c))] = (set(), math.inf)
+				for c in self.generate_all_functions_from_partition_to_range(P, self.h):
+					del_values[(leaf_node, (P, c))] = (set(), math.inf)
 		
 		return del_values
 
@@ -448,89 +416,93 @@ class AlgorithmWorker:
 		v = list(v)[0]
 		block_containing_v = set()
 
-		for state in self.generate_possible_component_states_of_bag(bag, self.h):
-			introduce_inhereted_cStates = set()
-
+		for P in self.generate_partitions_of_bag_of_size(bag, self.h):
 			# find block containing v
-			for block in state[0]:
+			for block in P:
 				if v in block:
 					block_containing_v = block
 
-			partition_without_block_containing_v = Partition(list(state[0].symmetric_difference(Partition([block_containing_v]))))
+			partition_without_block_containing_v = Partition(list(P.symmetric_difference(Partition([block_containing_v]))))
 
 			block_without_v = Block(block_containing_v.symmetric_difference(Block([v])))
 			refinements = self.generate_partitions_of_bag_of_size(block_without_v, len(block_without_v))
 
-			for refinement in refinements:
-				partition_prime = partition_without_block_containing_v.union(refinement)
-				all_Cs = self.algorithm3_function_generator(state[1], partition_without_block_containing_v, block_containing_v, refinement, self.h)
+			for c in self.generate_all_functions_from_partition_to_range(P, self.h):
+				introduce_inhereted_cStates = set()
 
-				for c_prime in all_Cs:
-					introduce_inhereted_cStates.add((partition_prime, c_prime))
+				for refinement in refinements:
+					partition_prime = partition_without_block_containing_v.union(refinement)
+					all_Cs = self.algorithm3_function_generator(c, partition_without_block_containing_v, block_containing_v, refinement, self.h)
 
-			minValue = math.inf
-			minValue_edge_set = set()
+					for c_prime in all_Cs:
+						introduce_inhereted_cStates.add((partition_prime, c_prime))
 
-			for state_prime in introduce_inhereted_cStates:
-				# unsure whether state should be state_prime or not (paper says state)
-				edge_set = self.edges_connecting_node_with_other_block_in_partition(v, bag, state[0])
-				value = (del_values_child[(child, state_prime)])[1] + len(edge_set)
-				if value < minValue:
-					minValue = value
-					minValue_edge_set = edge_set.union((del_values_child[(child, state_prime)])[0])
-					#if (len(minValue_edge_set) != minValue):
-					#	print("\n\nOH NO: minValue: %f, edge set: %r" % (minValue, minValue_edge_set))
-					#	print("child_set: %r" % (del_values_child[(child, state_prime)])[0])
-					#	print("edge_set: %r\n\n" % edge_set)
+				minValue = math.inf
+				minValue_edge_set = set()
 
-			if minValue <= self.k:
-				del_Values[(introduce_node, state)] = (minValue_edge_set, minValue)
-			else:
-				del_Values[(introduce_node, state)] = (set(), math.inf)
+				for state_prime in introduce_inhereted_cStates:
+					# unsure whether state should be state_prime or not (paper says state)
+					edge_set = self.edges_connecting_node_with_other_block_in_partition(v, bag, P)
+					child_del = del_values_child[(child, state_prime)]
+					value = child_del[1] + len(edge_set)
+					if value < minValue:
+						minValue = value
+						minValue_edge_set = edge_set.union(child_del[0])
+						#if (len(minValue_edge_set) != minValue):
+						#	print("\n\nOH NO: minValue: %f, edge set: %r" % (minValue, minValue_edge_set))
+						#	print("child_set: %r" % (del_values_child[(child, state_prime)])[0])
+						#	print("edge_set: %r\n\n" % edge_set)
+
+				if minValue <= self.k:
+					del_Values[(introduce_node, (P, c))] = (minValue_edge_set, minValue)
+				else:
+					del_Values[(introduce_node, (P, c))] = (set(), math.inf)
 		return del_Values
 
 	# Algorithm 5
 	def find_component_signatures_of_join_nodes(self, join_node, bag, child_1, child_2, del_values_child):
 		del_values = dict()
-		for (P, c) in self.generate_possible_component_states_of_bag(bag, self.h):
-			sigma_t1_t2_join = set()
+		for P in self.generate_partitions_of_bag_of_size(bag, self.h):
 			partition_1 = P
 			partition_2 = P
-			all_function_pairs = self.get_all_function_pairs(P, c)
 			edges_connecting_blocks_in_partition = self.edges_connecting_blocks_in_partition(bag, P)
 
-			for (c_1, c_2) in all_function_pairs:
-				sigma_t1_t2_join.add(((partition_1, c_1), (partition_2, c_2)))
-			
-			minValue = math.inf
-			minValueSet = set()
-			for (sigma_1, sigma_2) in sigma_t1_t2_join:
-				tuple_child_1 = del_values_child[(child_1, sigma_1)]
-				tuple_child_2 = del_values_child[(child_2, sigma_2)]
+			for c in self.generate_all_functions_from_partition_to_range(P, self.h):
+				sigma_t1_t2_join = set()
+				all_function_pairs = self.get_all_function_pairs(P, c)
 
-				value = (tuple_child_1[1] + tuple_child_2[1] 
-						 - len(edges_connecting_blocks_in_partition))
+				for (c_1, c_2) in all_function_pairs:
+					sigma_t1_t2_join.add(((partition_1, c_1), (partition_2, c_2)))
+				
+				minValue = math.inf
+				minValueSet = set()
+				for (sigma_1, sigma_2) in sigma_t1_t2_join:
+					tuple_child_1 = del_values_child[(child_1, sigma_1)]
+					tuple_child_2 = del_values_child[(child_2, sigma_2)]
 
-				if (value == -1):
-					print("\n___________________________________\n")
-					print("Found a -1 value!")
-					print("Node: %r" % join_node)
-					print("Child1: %r" % child_1)
-					print("tuple1:{}".format(tuple_child_1))
-					print("Child2: %r" % child_2)
-					print("tuple2: {}".format(tuple_child_2))
-					print("edges_connecting: %r" % edges_connecting_blocks_in_partition)
+					value = (tuple_child_1[1] + tuple_child_2[1] 
+							- len(edges_connecting_blocks_in_partition))
 
-				if(value < minValue):
-					minValue = value
-					# minValueSet = edges_connecting_blocks_in_partition
-					minValueSet = tuple_child_1[0].union(tuple_child_2[0])#.difference(edges_connecting_blocks_in_partition)
-					#edges_connecting_blocks_in_partition
+					if (value == -1):
+						print("\n___________________________________\n")
+						print("Found a -1 value!")
+						print("Node: %r" % join_node)
+						print("Child1: %r" % child_1)
+						print("tuple1:{}".format(tuple_child_1))
+						print("Child2: %r" % child_2)
+						print("tuple2: {}".format(tuple_child_2))
+						print("edges_connecting: %r" % edges_connecting_blocks_in_partition)
 
-			if(minValue <= self.k):
-				del_values[join_node, (P, c)] = (minValueSet, minValue)
-			else:
-				del_values[join_node, (P, c)] = (set(), math.inf)
+					if(value < minValue):
+						minValue = value
+						# minValueSet = edges_connecting_blocks_in_partition
+						minValueSet = tuple_child_1[0].union(tuple_child_2[0])#.difference(edges_connecting_blocks_in_partition)
+						#edges_connecting_blocks_in_partition
+
+				if(minValue <= self.k):
+					del_values[join_node, (P, c)] = (minValueSet, minValue)
+				else:
+					del_values[join_node, (P, c)] = (set(), math.inf)
 
 		return del_values
 
@@ -669,56 +641,55 @@ class AlgorithmWorker:
 
 		(v,) = child_extra_nodes
 
-		for state in self.generate_possible_component_states_of_bag(node.bag, self.h):
-			P = state[0]
-			c = state[1]
-
-			child_forget_inherited_states = list()
+		for P in self.generate_partitions_of_bag_of_size(node.bag, self.h):
 			all_child_partitions = self.get_all_extended_partitions(P, v)
 
-			for child_partition in all_child_partitions:
-				all_child_functions = list()
-				child_c = Function(dict())
-				vSingleton = False
+			for c in self.generate_all_functions_from_partition_to_range(P, self.h):
+				child_forget_inherited_states = list()
 
-				for block in child_partition:
-					block_without_v = Block(list(block.node_list))
-					if (v in block_without_v):
-						block_without_v.remove(v)
+				for child_partition in all_child_partitions:
+					all_child_functions = list()
+					child_c = Function(dict())
+					vSingleton = False
 
-					if len(block_without_v) == 0:
-						vSingleton = True
+					for block in child_partition:
+						block_without_v = Block(list(block.node_list))
+						if (v in block_without_v):
+							block_without_v.remove(v)
+
+						if len(block_without_v) == 0:
+							vSingleton = True
+						else:
+							# Algorithm from paper just reads 'child_c[block] = c[block_without_v]' here, which can
+							# result in invalid child_c functions (which the paper just ignores).
+							# We check all functions for validity below, before proceeding with the minimum search.
+							child_c[block] = c[block_without_v]
+					
+					if not vSingleton:
+						all_child_functions.append(child_c)
 					else:
-						# Algorithm from paper just reads 'child_c[block] = c[block_without_v]' here, which can
-						# result in invalid child_c functions (which the paper just ignores).
-						# We check all functions for validity below, before proceeding with the minimum search.
-						child_c[block] = c[block_without_v]
-				
-				if not vSingleton:
-					all_child_functions.append(child_c)
+						for i in range(1, self.h + 1):
+							c_copy = Function(dict(child_c.dictionary))
+							c_copy[Block([v])] = i
+							all_child_functions.append(c_copy)
+
+					# This doesn't quite match the pseudo-code, but it makes more sense and matches the
+					# reference implementation.
+					for c_i in all_child_functions:
+						if (self.is_valid_function(child_partition, c_i)):
+							child_forget_inherited_states.append((child_partition, c_i))
+
+				min_value = math.inf
+				min_set = set()
+				for sigma in child_forget_inherited_states:
+					(val_set, val) = del_values_child[(child_node, sigma)]
+					if val < min_value:
+						min_value = val
+						min_set = val_set
+				if min_value <= self.k:
+					del_values[(node, (P, c))] = (min_set, min_value)
 				else:
-					for i in range(1, self.h + 1):
-						c_copy = Function(dict(child_c.dictionary))
-						c_copy[Block([v])] = i
-						all_child_functions.append(c_copy)
-
-				# This doesn't quite match the pseudo-code, but it makes more sense and matches the
-				# reference implementation.
-				for c_i in all_child_functions:
-					if (self.is_valid_function(child_partition, c_i)):
-						child_forget_inherited_states.append((child_partition, c_i))
-
-			min_value = math.inf
-			min_set = set()
-			for sigma in child_forget_inherited_states:
-				(val_set, val) = del_values_child[(child_node, sigma)]
-				if val < min_value:
-					min_value = val
-					min_set = val_set
-			if min_value <= self.k:
-				del_values[(node, state)] = (min_set, min_value)
-			else:
-				del_values[(node, state)] = (set(), math.inf)
+					del_values[(node, (P, c))] = (set(), math.inf)
 		return del_values
 
 	def get_all_extended_partitions(self, partition, new_node):
