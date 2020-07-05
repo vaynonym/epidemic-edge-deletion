@@ -554,18 +554,17 @@ class AlgorithmWorker:
 	def get_all_function_pairs(self, partition, c):
 		all_function_pairs = set()
 		all_function_pairs.add((Function(dict()), Function(dict()))) # initial set of undefined functions used to generate the rest
-	
+
 		# partially define function by setting the mapping for each block
 		for block in partition:
 
 			# for each possible value that a block could be mapped to
 			new_all_function_pairs = []
-			for c_1_codomain_value in range(1, self.h + 1):
+			for c_1_codomain_value in range(len(block), self.h + 1):
 				# go over each possible combination of c1 and c2 values
-				for c_2_codomain_value in range(1, self.h + 1):
+				for c_2_codomain_value in range(len(block), self.h + 1):
 					# if that pair of values is legal
-					if (c_1_codomain_value + c_2_codomain_value - len(block) == c[block]
-						and c_1_codomain_value >= len(block) and c_2_codomain_value >= len(block)):
+					if c_1_codomain_value + c_2_codomain_value - len(block) == c[block]:
 						# then for each function that already exists
 						for function_pair in all_function_pairs:
 							# create a new function with the only difference being
@@ -577,8 +576,62 @@ class AlgorithmWorker:
 							new_all_function_pairs.append(new_function_pair)
 			
 			all_function_pairs = new_all_function_pairs
+		
+
 
 		return all_function_pairs
+
+	# def get_all_function_pairs(self, partition, c):
+	# 	min_Values_Of_Blocks = []
+	# 	for block in partition:
+	# 		min_Values_Of_Blocks.append((len(block), len(block)))
+		
+	# 	current_Values_Of_Blocks = list(min_Values_Of_Blocks)
+
+	# 	last_Values_Of_Blocks = [(self.h, self.h)] * len(partition)
+	# 	counter = 0
+	# 	while not current_Values_Of_Blocks == last_Values_Of_Blocks:
+	# 		counter += 1
+	# 		function_1 = dict()
+	# 		function_2 = dict()
+	# 		is_valid = True
+	# 		for i in range(len(partition)):
+	# 			block = partition[i]
+	# 			if(not current_Values_Of_Blocks[i][0] + current_Values_Of_Blocks[i][1] - len(block) == c[block]):
+	# 				is_valid = False
+	# 				break
+	# 			function_1[block] = current_Values_Of_Blocks[i][0]
+	# 			function_2[block] = current_Values_Of_Blocks[i][1]
+
+	# 		if(is_valid):
+	# 			yield Function(function_1), Function(function_2)
+
+	# 		for i in range(len(current_Values_Of_Blocks)):
+	# 			current_Value = current_Values_Of_Blocks[i]
+	# 			if(current_Value[1] != self.h):
+	# 				current_Values_Of_Blocks[i] = (current_Value[0], current_Value[1] + 1)
+	# 				for j in range(i):
+	# 					current_Values_Of_Blocks[j] = min_Values_Of_Blocks[j]
+	# 				break
+						
+	# 			elif(current_Value[0] != self.h):
+	# 				current_Values_Of_Blocks[i] = (current_Value[0] + 1, min_Values_Of_Blocks[i][1])
+	# 				for j in range(i):
+	# 					current_Values_Of_Blocks[j] = min_Values_Of_Blocks[j]
+	# 				break
+
+	# 	function_1 = dict()
+	# 	function_2 = dict()
+	# 	for i in range(len(partition)):
+	# 		function_1[partition[i]] = current_Values_Of_Blocks[i][0]
+	# 		function_2[partition[i]] = current_Values_Of_Blocks[i][1]
+	# 	yield Function(function_1), Function(function_2)
+
+	# 	print(partition)
+
+	# 	print(counter)
+	# 	exit()
+
 
 	# takes the edges of the induced subgraph and the current state
 	# returns set of edges
