@@ -30,7 +30,7 @@ class Algorithm:
 		self.root = self.nice_tree_decomposition.root
 		leafs = self.nice_tree_decomposition.find_leafs()
 
-		process_count = min(2, len(leafs))
+		process_count = min(11, len(leafs))
 
 		result_queue = multiprocessing.Queue()
 
@@ -312,44 +312,36 @@ class AlgorithmWorker:
 				yield (partition, function)
 
 	# Generates all partitions of 'bag' consisting of blocks of size at most 'size'.
-	def generate_partitions_of_bag_of_size_2(self, bag, size):
+	def generate_partitions_of_bag_of_size(self, bag, size):
 		bag = list(bag)
 		n = len(bag)
 
-		# This ultimately generates all possible partitions, just discarding those
+		if (n == 0):
+			yield Partition([])
+			return
+
+		# This generates all possible partitions, just discarding those
 		# not meeting the size constraints.
 
 		current_partition = [1] * n
 		max_tracker = [0] + [1] * (n-1)
 
 		while True:
+			#import pdb; pdb.set_trace()
 			# Build a Partition object out of current_partition and yield it
 			# if it satifies the block size constraint.
-			block_index = 1
-			block_size = 0
-			block = []
-			partition = []
-			skip_partition = False
+			partition = [ [] for _ in range(max(current_partition)) ]
 			for i in range(n):
-				if (current_partition[i] != block_index):
-					partition.append(Block(block))
-					block = []
-					block_index = current_partition[i]
-					block_size = 0
+				partition[current_partition[i] - 1].append(bag[i])
 
-				if (block_size == size):
+			skip_partition = False
+			for i in range(len(partition)):
+				if (len(partition[i]) > size):
 					skip_partition = True
 					break
 
-				block.append(bag[i])
-				block_size += 1
-
-				if (i == n - 1):
-					partition.append(Block(block))
-
-
 			if (not skip_partition):
-				yield Partition(partition)
+				yield Partition([Block(b) for b in partition])
 
 			# Transform current_partition into the next possible partition
 
@@ -373,7 +365,7 @@ class AlgorithmWorker:
 				max_tracker[j] = max(current_partition[j-1], max_tracker[j-1])
 
 
-	def generate_partitions_of_bag_of_size(self, bag, size):
+	def generate_partitions_of_bag_of_size_2(self, bag, size):
 		partitions = set()
 		initial_partition = Partition([])
 		for node in bag:
