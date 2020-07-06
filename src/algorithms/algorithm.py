@@ -838,6 +838,8 @@ class AlgorithmWorker:
 				
 			if(block_containing_u != block_containing_w):
 				result.add((u,w))
+		#if len(partition) > 1:
+		#	ForkablePdb().set_trace()
 		return result
 
 	def edges_connecting_node_with_other_block_in_partition(self, node, bag, partition):

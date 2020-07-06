@@ -47,11 +47,12 @@ def main(h, k, state_filter, load_flag, singlethreaded, ignore_edge_set):
 
 	result_edges = set()
 	result_k = 0
-	connected_compoents = nx.connected_components(graph)
+	connected_components = nx.connected_components(graph)
 	counter = 0
-	for nodes in connected_compoents:
+	for nodes in connected_components:
+
 		if len(nodes) <= h:
-			break
+			continue
 		component = graph.subgraph(nodes).copy()
 		counter += 1
 

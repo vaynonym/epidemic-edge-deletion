@@ -100,7 +100,7 @@ class Preprocessor:
 						#	district1.neighbours.append(district2)    
 						#if(not district1 in district2.neighbours):
 						#	district2.neighbours.append(district1)
-						if(district1.number_of_cases >= normal(25, 10)):
+						if(district1.number_of_cases >= normal(40, 10)):
 							district_graph.add_edge(i, j)
 				print("Finished {count} out of {max_count}".format(count = i, max_count = identifier))
 			save(district_graph, graph_file_name)
