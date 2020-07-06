@@ -15,7 +15,7 @@ class Nice_Tree_Decomposition:
         return self.graph.predecessors(node)
     
     def find_leafs(self):
-        return [x for x in self.graph.nodes() if self.graph.out_degree(x)==0 and self.graph.in_degree(x)==1]
+        return [x for x in self.graph.nodes() if x.node_type == Nice_Tree_Node.LEAF]
 
 class Nice_Tree_Node:
     node_index = 0

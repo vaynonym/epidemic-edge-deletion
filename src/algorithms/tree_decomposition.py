@@ -68,7 +68,7 @@ class Tree_Decomposer:
 	def choose_root(self):
 		# for now chosen randomly
 		# list(graph) returns a list of the nodes (random.choice needs iterable object)
-		highest_deg = 0
+		highest_deg = -1
 		node_with_hg = None
 		for node in self.graph.nodes():
 			node_deg = len(set(self.graph.neighbors(node)))
@@ -230,6 +230,7 @@ class Tree_Decomposer:
 		for node in list(self.graph.nodes):
 			gnode = ntd.Nice_Tree_Node(set(node))
 			node_pair_dict[node] = gnode
+			graph.add_node(gnode)
 		for node in node_pair_dict:
 			for edge in list(self.graph.edges(node)):
 				graph.add_edge(node_pair_dict[edge[0]],node_pair_dict[edge[1]])

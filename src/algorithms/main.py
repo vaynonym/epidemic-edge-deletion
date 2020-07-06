@@ -37,34 +37,55 @@ def main(h, k, state_filter, load_flag, singlethreaded):
 
 	print("District graph has %d nodes and %d edges." % ((len(graph.nodes), len(graph.edges))))
 
-	print("  __________________________")
-	print(" /		            \\")
-	print("| Gen. Tree Decomposition... |")
-	print(" \\__________________________/")
-	print()
-	
-	tree_decomposer = td.Tree_Decomposer(graph)
-	nice_tree_decomposition = ntd.Nice_Tree_Decomposition(tree_decomposer.make_nice_tree_decomposition())
+	result_edges = set()
+	result_k = 0
+	connected_compoents = nx.connected_components(graph)
+	for nodes in connected_compoents:
+		if len(nodes) <= h:
+			break
+		component = graph.subgraph(nodes).copy()
 
-	print("NTD has %d nodes" % len(nice_tree_decomposition.graph.nodes))
-	print("Nice properties: %r" % tree_decomposer.check_nice_tree_node_properties())
 
-	print_graph(nice_tree_decomposition.graph, 'output/ntd.png', False)
-	print_graph(nice_tree_decomposition.graph, 'output/ntd_planar.png', True)
+		print("  __________________________")
+		print(" /		            \\")
+		print("| Gen. Tree Decomposition... |")
+		print(" \\__________________________/")
+		print()
+		
+		tree_decomposer = td.Tree_Decomposer(component)
+		print_graph(tree_decomposer.TD[1], 'output/td.png', False)
+		nice_tree_decomposition = ntd.Nice_Tree_Decomposition(tree_decomposer.make_nice_tree_decomposition())
 
-	print("  __________________________")
-	print(" /		            \\")
-	print("|   Starting the Algorithm   |")
-	print(" \\__________________________/")
-	print()
+		print("NTD has %d nodes" % len(nice_tree_decomposition.graph.nodes))
+		print("Nice properties: %r" % tree_decomposer.check_nice_tree_node_properties())
 
-	algorithm = algo.Algorithm(graph, nice_tree_decomposition, h, k)
-	root_node_signature = None
-	if(singlethreaded):
-		root_node_signature = algorithm.execute_singlethreaded()
-	else:
-		root_node_signature = algorithm.execute()
-	
+		
+		print_graph(nice_tree_decomposition.graph, 'output/ntd.png', False)
+		print_graph(nice_tree_decomposition.graph, 'output/ntd_planar.png', True)
+
+		print("  __________________________")
+		print(" /		            \\")
+		print("|   Starting the Algorithm   |")
+		print(" \\__________________________/")
+		print()
+
+		algorithm = algo.Algorithm(component, nice_tree_decomposition, h, k)
+		root_node_signature = None
+		if(singlethreaded):
+			root_node_signature = algorithm.execute_singlethreaded()
+		else:
+			root_node_signature = algorithm.execute()
+		
+		min_val = math.inf
+		min_edges = set()
+		for (edges, val) in root_node_signature.values():
+			if (val < min_val):
+				min_val = val
+				min_edges = edges
+		result_k += min_val
+		result_edges.update(min_edges)
+		print(list(component.edges()))
+
 	#print("result:")
 	#print(root_node_signature)
 	print("  __________________________")
@@ -72,21 +93,21 @@ def main(h, k, state_filter, load_flag, singlethreaded):
 	print("|  ...Programm is finished   |")
 	print(" \\__________________________/")
 	
-	print(interpret_result(root_node_signature, identifier_to_district_dictionary, position_dictionary, name_dictionary, graph))
+	print(interpret_result(result_edges, result_k, identifier_to_district_dictionary, position_dictionary, name_dictionary, graph))
 	
 
 
-def interpret_result(root_node_signature, identifier_to_district_dictionary, position_dictionary, name_dictionary, graph):
-	min_val = math.inf
-	min_edges = set()
-	for (edges, val) in root_node_signature.values():
-		if (val < min_val):
-			min_val = val
-			min_edges = edges
+def interpret_result(result_edges, result_k, identifier_to_district_dictionary, position_dictionary, name_dictionary, graph):
+	# min_val = math.inf
+	# min_edges = set()
+	# for (edges, val) in root_node_signature.values():
+	# 	if (val < min_val):
+	# 		min_val = val
+	# 		min_edges = edges
 
-	print("Found an edge set to delete with %f edges: %s" % (min_val, min_edges))
+	print("Found an edge set to delete with %f edges: %s" % (result_k, result_edges))
 
-	graph.remove_edges_from(min_edges)
+	graph.remove_edges_from(result_edges)
 
 	plt.figure(num=None, figsize=(15, 15), dpi=256)
 		
