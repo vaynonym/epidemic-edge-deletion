@@ -26,7 +26,7 @@ def save_dgf_file(graph, filename):
 		for edge in graph.edges:
 			file.write("e %d %d\n" % (edge[0], edge[1]))
 
-def main(h, k, state_filter, load_flag, singlethreaded):
+def main(h, k, state_filter, load_flag, singlethreaded, ignore_edge_set):
 
 	print("  __________________________")
 	print(" /		            \\")
@@ -80,7 +80,7 @@ def main(h, k, state_filter, load_flag, singlethreaded):
 		print(" \\__________________________/")
 		print()
 
-		algorithm = algo.Algorithm(component, nice_tree_decomposition, h, k)
+		algorithm = algo.Algorithm(component, nice_tree_decomposition, h, k, ignore_edge_set)
 		root_node_signature = None
 		if(singlethreaded):
 			root_node_signature = algorithm.execute_singlethreaded()
@@ -139,6 +139,7 @@ if __name__ == "__main__":
 	parser.add_argument("-k", type=int)
 	parser.add_argument("--load", action='store_true')
 	parser.add_argument("--singlethreaded", action='store_true')
+	parser.add_argument("--ignore-edge-set", action='store_true')
 	args = parser.parse_args()
 
 	if (args.h == None):
@@ -149,5 +150,5 @@ if __name__ == "__main__":
 		print("Error: -k paramter is required!")
 		sys.exit(1)
 
-	main(args.h, args.k, args.states, args.load, args.singlethreaded)
+	main(args.h, args.k, args.states, args.load, args.singlethreaded, args.ignore_edge_set)
 

@@ -15,17 +15,15 @@ import queue
 
 from guppy import hpy
 
-# TODO: Improvement ideas
-# - Cancel as soon as any node doesn't have any valid state anymore
-
 class Algorithm:
 	
-	def __init__(self, graph, nice_tree_decomposition, h, k):
+	def __init__(self, graph, nice_tree_decomposition, h, k, ignore_edge_sets):
 		self.graph = graph
 		self.h = h
 		self.k = k
 		self.nice_tree_decomposition = nice_tree_decomposition
 		self.component_signatures = dict()
+		self.ignore_edge_sets = ignore_edge_sets
 		setproctitle("Epidemic Edge Deletion")
 
 	def execute(self):
@@ -44,7 +42,7 @@ class Algorithm:
 
 		for i in range(process_count):
 			wq = multiprocessing.Queue()
-			p = multiprocessing.Process(target=worker, args=(i, self.graph, self.nice_tree_decomposition, self.h, self.k, wq, result_queue, calculated_nodes, total_nodes))
+			p = multiprocessing.Process(target=worker, args=(i, self.graph, self.nice_tree_decomposition, self.h, self.k, wq, result_queue, calculated_nodes, total_nodes, self.ignore_edge_sets))
 			p.start()
 			processes.append(p)
 			work_queues.append(wq)
@@ -236,13 +234,13 @@ class Algorithm:
 		
 		return True
 
-def worker(process_index, graph, nice_tree_decomposition, h, k, work_queue, result_queue, calculated_nodes, total_nodes):
+def worker(process_index, graph, nice_tree_decomposition, h, k, work_queue, result_queue, calculated_nodes, total_nodes, ignore_edge_sets):
 	setproctitle("Epidemic Edge Deletion Worker %d" % process_index)
 
 	#this_process = psutil.Process(os.getpid())
 	hp = hpy()
 		
-	alg = AlgorithmWorker(graph, nice_tree_decomposition, h, k, process_index)
+	alg = AlgorithmWorker(graph, nice_tree_decomposition, h, k, process_index, ignore_edge_sets)
 
 	#hp.setrelheap()
 	
@@ -313,12 +311,13 @@ def join_helper(graph, nice_tree_decomposition, h, k, node, child_1, child_2, ch
 		partition = wq.get()
 
 class AlgorithmWorker:
-	def __init__(self, graph, nice_tree_decomposition, h, k, process_index = 0):
+	def __init__(self, graph, nice_tree_decomposition, h, k, process_index = 0, ignore_edge_sets = False):
 		self.graph = graph
 		self.h = h
 		self.k = k
 		self.nice_tree_decomposition = nice_tree_decomposition
 		self.process_index = process_index
+		self.ignore_edge_sets = ignore_edge_sets
 	
 	def calculate_component_signature_of_node(self, node, children, child_component_signatures):
 		if(node.node_type == ntd.Nice_Tree_Node.LEAF):
@@ -490,10 +489,14 @@ class AlgorithmWorker:
 		del_values = dict()
 		for P in self.generate_partitions_of_bag_of_size(bag, self.h):
 			potential_edges_to_remove = self.edges_connecting_blocks_in_partition(bag, P)
+			l = len(potential_edges_to_remove)
+
+			if (self.ignore_edge_sets):
+				potential_edges_to_remove = set()
 			
-			if(len(potential_edges_to_remove) <= self.k):
+			if(l <= self.k):
 				for c in self.generate_all_functions_from_partition_to_range(P, self.h):
-					del_values[(leaf_node, (P, c))] = (potential_edges_to_remove, len(potential_edges_to_remove))
+					del_values[(leaf_node, (P, c))] = (potential_edges_to_remove, l)
 			#else:
 			#	for c in self.generate_all_functions_from_partition_to_range(P, self.h):
 			#		del_values[(leaf_node, (P, c))] = (set(), math.inf)
@@ -542,14 +545,18 @@ class AlgorithmWorker:
 					value = child_del[1] + len(edge_set)
 					if value < minValue:
 						minValue = value
-						minValue_edge_set = edge_set.union(child_del[0])
+						if not self.ignore_edge_sets:
+							minValue_edge_set = edge_set.union(child_del[0])
 						#if (len(minValue_edge_set) != minValue):
 						#	print("\n\nOH NO: minValue: %f, edge set: %r" % (minValue, minValue_edge_set))
 						#	print("child_set: %r" % (del_values_child[(child, state_prime)])[0])
 						#	print("edge_set: %r\n\n" % edge_set)
 
 				if minValue <= self.k:
-					del_Values[(introduce_node, (P, c))] = (minValue_edge_set, minValue)
+					if not self.ignore_edge_sets:
+						del_Values[(introduce_node, (P, c))] = (minValue_edge_set, minValue)
+					else:
+						del_Values[(introduce_node, (P, c))] = (set(), minValue)
 				#else:
 				#	del_Values[(introduce_node, (P, c))] = (set(), math.inf)
 		return del_Values
@@ -581,11 +588,15 @@ class AlgorithmWorker:
 					if(value < minValue):
 						minValue = value
 						# minValueSet = edges_connecting_blocks_in_partition
-						minValueSet = tuple_child_1[0].union(tuple_child_2[0])#.difference(edges_connecting_blocks_in_partition)
+						if not self.ignore_edge_sets:
+							minValueSet = tuple_child_1[0].union(tuple_child_2[0])#.difference(edges_connecting_blocks_in_partition)
 						#edges_connecting_blocks_in_partition
 
 				if(minValue <= self.k):
-					del_values[join_node, (P, c)] = (minValueSet, minValue)
+					if not self.ignore_edge_sets:
+						del_values[join_node, (P, c)] = (minValueSet, minValue)
+					else:
+						del_values[join_node, (P, c)] = (set(), minValue)
 				#else:
 				#	del_values[join_node, (P, c)] = (set(), math.inf)
 
@@ -959,9 +970,14 @@ class AlgorithmWorker:
 
 					if val < min_value:
 						min_value = val
-						min_set = val_set
+						if not self.ignore_edge_sets:
+							min_set = val_set
+
 				if min_value <= self.k:
-					del_values[(node, (P, c))] = (min_set, min_value)
+					if not self.ignore_edge_sets:
+						del_values[(node, (P, c))] = (min_set, min_value)
+					else:
+						del_values[(node, (P, c))] = (set(), min_value)
 				#else:
 				#	del_values[(node, (P, c))] = (set(), math.inf)
 		return del_values
