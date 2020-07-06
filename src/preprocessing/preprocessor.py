@@ -105,7 +105,6 @@ class Preprocessor:
 				print("Finished {count} out of {max_count}".format(count = i, max_count = identifier))
 			save(district_graph, graph_file_name)
 			save_graph_file(district_graph)
-			save_dgf_file(district_graph)
 			
 			
 		district_graph.remove_nodes_from(list(nx.isolates(district_graph)))
