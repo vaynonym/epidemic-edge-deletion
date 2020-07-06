@@ -18,6 +18,14 @@ def print_graph(graph, filename, planar):
 
 	plt.savefig(filename)
 
+def save_dgf_file(graph, filename):
+	with open(filename, 'w') as file:
+		node_count = len(graph.nodes)
+		edge_count = len(graph.edges)
+		file.write("p edge %d %d\n" % (node_count, edge_count))
+		for edge in graph.edges:
+			file.write("e %d %d\n" % (edge[0], edge[1]))
+
 def main(h, k, state_filter, load_flag, singlethreaded):
 
 	print("  __________________________")
@@ -40,11 +48,12 @@ def main(h, k, state_filter, load_flag, singlethreaded):
 	result_edges = set()
 	result_k = 0
 	connected_compoents = nx.connected_components(graph)
+	counter = 0
 	for nodes in connected_compoents:
 		if len(nodes) <= h:
 			break
 		component = graph.subgraph(nodes).copy()
-
+		counter += 1
 
 		print("  __________________________")
 		print(" /		            \\")
@@ -55,6 +64,8 @@ def main(h, k, state_filter, load_flag, singlethreaded):
 		tree_decomposer = td.Tree_Decomposer(component)
 		print_graph(tree_decomposer.TD[1], 'output/td.png', False)
 		nice_tree_decomposition = ntd.Nice_Tree_Decomposition(tree_decomposer.make_nice_tree_decomposition())
+
+		save_dgf_file(component, "output/comp%d_ourtwis%d.dgf" % (counter, tree_decomposer.TD[0]))
 
 		print("NTD has %d nodes" % len(nice_tree_decomposition.graph.nodes))
 		print("Nice properties: %r" % tree_decomposer.check_nice_tree_node_properties())
@@ -139,3 +150,4 @@ if __name__ == "__main__":
 		sys.exit(1)
 
 	main(args.h, args.k, args.states, args.load, args.singlethreaded)
+

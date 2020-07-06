@@ -104,7 +104,8 @@ class Preprocessor:
 							district_graph.add_edge(i, j)
 				print("Finished {count} out of {max_count}".format(count = i, max_count = identifier))
 			save(district_graph, graph_file_name)
-
+			save_graph_file(district_graph)
+			save_dgf_file(district_graph)
 			
 			
 		district_graph.remove_nodes_from(list(nx.isolates(district_graph)))
@@ -138,7 +139,13 @@ def save(G, fname):
 def load(fname):
 	return nx.read_gpickle(fname)
 
-	
+# This saves the graph to the format the original fpt-edge-deletion code expects.
+# (https://github.com/magicicada/fpt-edge-deletion/blob/master/graphFunctions.py)
+def save_graph_file(graph):
+	with open("output/graph", 'w') as file:
+		for edge in graph.edges:
+			file.write("%d %d\n" % (edge[0], edge[1]))
+
 
 @functools.total_ordering
 class DistrictPolygon:

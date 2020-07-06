@@ -8,10 +8,12 @@ import src.algorithms.nice_tree_decomposition as ntd
 
 class Tree_Decomposer:
 	
-	def __init__(self, graph):
+	def __init__(self, graph, save_td = False):
 		self.TD = nx.algorithms.approximation.treewidth.treewidth_min_degree(graph)
 		print("Got a treewidth of %d" % self.TD[0])
 		self.graph = self.TD[1]
+		if (save_td):
+			self.save_td_file()
 	
 	def make_nice_tree_decomposition(self):
 
@@ -279,3 +281,22 @@ class Tree_Decomposer:
 				if not node.node_type == node.LEAF:
 					return False
 		return True
+
+	# This saves the TD to the format the original fpt-edge-deletion code expects.
+	# (https://github.com/magicicada/fpt-edge-deletion/blob/master/JessDotParsing.py)
+	def save_td_file(self):
+		node_ids = dict()
+		counter = 0
+		for node in self.graph.nodes:
+			node_ids[node] = counter
+			counter += 1
+
+		with open("output/TreeDecompgraph.dgf.txt", 'w') as dot_file:
+			for node in self.graph.nodes:
+				# Format:
+				# <node> label "<bag item> <bag item> ...
+				dot_file.write("%d label \"%s\n" % (node_ids[node],
+					" ".join([str(i) for i in node])))
+
+			for edge in self.graph.edges:
+				dot_file.write("%d -- %d\n" % (node_ids[edge[0]], node_ids[edge[1]]))
