@@ -9,7 +9,9 @@ import traceback
 import gc
 import psutil
 import os
+import time
 from setproctitle import setproctitle 
+import queue
 
 from guppy import hpy
 
@@ -30,7 +32,7 @@ class Algorithm:
 		self.root = self.nice_tree_decomposition.root
 		leafs = self.nice_tree_decomposition.find_leafs()
 
-		process_count = min(3, len(leafs))
+		process_count = min(11, len(leafs))
 
 		result_queue = multiprocessing.Queue()
 
@@ -52,11 +54,17 @@ class Algorithm:
 		for i in range(process_count):
 			self.queue_node_and_preds(work_queues[i], leafs.pop(-1))
 
+		did_early_exit = False
 		while (calculated_nodes.value < total_nodes):
 			# Read a single result
-			(process_index, node, component_signature) = result_queue.get()
+			(process_index, node, component_signature, early_exit) = result_queue.get()
 			
 			print("Received a result from P%d" % process_index)
+
+			if (early_exit):
+				print("Got a result indicating no solution can be found, aborting...")
+				did_early_exit = True
+				break
 
 			#self.validate_signature(node, component_signature)
 
@@ -90,7 +98,7 @@ class Algorithm:
 		for p in processes:
 			p.join()
 
-		return self.component_signatures[self.root]
+		return self.component_signatures[self.root] if not did_early_exit else dict()
 
 	def execute_singlethreaded(self):
 		self.root = self.nice_tree_decomposition.root
@@ -234,9 +242,11 @@ def worker(process_index, graph, nice_tree_decomposition, h, k, work_queue, resu
 	#this_process = psutil.Process(os.getpid())
 	hp = hpy()
 		
-	alg = AlgorithmWorker(graph, nice_tree_decomposition, h, k)
+	alg = AlgorithmWorker(graph, nice_tree_decomposition, h, k, process_index)
 
 	#hp.setrelheap()
+	
+	sigsizedict = {}
 
 	(node, join_children, join_signatures, has_more_in_branch) = work_queue.get()
 	last_comp_signature = None
@@ -255,11 +265,21 @@ def worker(process_index, graph, nice_tree_decomposition, h, k, work_queue, resu
 			with calculated_nodes.get_lock():
 				calculated_nodes.value += 1
 
+			should_early_exit = len(last_comp_signature) == 0
+
 			if (not has_more_in_branch):
-				result_queue.put((process_index, node, last_comp_signature))
+				result_queue.put((process_index, node, last_comp_signature, should_early_exit))
 
 			#result_queue.put((process_index, node, component_signature))
-			#print ("[P%d] Worker finished %s node: %r" % (process_index, node.node_type, node))
+			print ("[P%d] Worker finished %s node: %r" % (process_index, node.node_type, node))
+
+			compSize = len(last_comp_signature)
+			bagSize = len(node.bag)
+
+			if (bagSize in sigsizedict):
+				sigsizedict[bagSize].append(compSize)
+			else:
+				sigsizedict[bagSize] = [compSize]
 
 			#print("[P%d] Memory usage before GC: %d" % (process_index, this_process.memory_info().rss))
 			#gc.collect()
@@ -276,16 +296,29 @@ def worker(process_index, graph, nice_tree_decomposition, h, k, work_queue, resu
 			print("child_component_signatures is %r" % (join_signatures if node.node_type == ntd.Nice_Tree_Node.JOIN else last_comp_signature))
 		except KeyboardInterrupt as i:
 			print("[P%d] Received an interrupt, cancelling." % (process_index,))
-			if (process_index == 2):
+			print("[P%d] sigsizedict: %r" % (process_index, sigsizedict))
+			if (process_index == 0):
 				ForkablePdb().set_trace()
 			raise i
 
+def join_helper(graph, nice_tree_decomposition, h, k, node, child_1, child_2, child_signatures, wq, rq):
+	setproctitle("Epidemic Edge Deletion Join Helper")
+
+	alg = AlgorithmWorker(graph, nice_tree_decomposition, h, k)
+
+	partition = wq.get()
+	while (partition != None):
+		results = alg.find_component_signatures_of_join_nodes_with_part(node, node.bag, child_1, child_2, child_signatures, partition)
+		rq.put(results)
+		partition = wq.get()
+
 class AlgorithmWorker:
-	def __init__(self, graph, nice_tree_decomposition, h, k):
+	def __init__(self, graph, nice_tree_decomposition, h, k, process_index = 0):
 		self.graph = graph
 		self.h = h
 		self.k = k
 		self.nice_tree_decomposition = nice_tree_decomposition
+		self.process_index = process_index
 	
 	def calculate_component_signature_of_node(self, node, children, child_component_signatures):
 		if(node.node_type == ntd.Nice_Tree_Node.LEAF):
@@ -305,6 +338,13 @@ class AlgorithmWorker:
 			child_2 = children[1]
 			return self.find_component_signatures_of_join_nodes(node, node.bag, child_1, child_2, child_component_signatures)
 
+	# (hlp, hlp_wq, hlp_rq) = self.launch_join_helper(HELPER_PARTITION_COUNT)
+	def launch_join_helper(self, node, child_1, child_2, child_signatures, queue_capacity):
+		wq = multiprocessing.Queue(queue_capacity)
+		rq = multiprocessing.Queue(queue_capacity)
+		p = multiprocessing.Process(target=join_helper,
+			args=(self.graph, self.nice_tree_decomposition, self.h, self.k, node, child_1, child_2, child_signatures, wq, rq))
+		p.start()
 
 	def generate_possible_component_states_of_bag(self, bag, h):
 		for partition in self.generate_partitions_of_bag_of_size(bag, h):
@@ -550,6 +590,140 @@ class AlgorithmWorker:
 
 		return del_values
 
+	def find_component_signatures_of_join_nodes_multiprocess(self, join_node, bag, child_1, child_2, del_values_child):
+		del_values = dict()
+
+		# Get the next (up to) N partitions and put them in a list.
+		# (make sure to handle less than N partitions remaining)
+		# Divide those in two.
+		# Start a helper process, giving it half of them.
+		# Process half on our own.
+		# Read back results from helper.
+		# Start from the top.
+
+		# Or, better, but more complicated:
+
+		# Get the next (up to) N partitions and put them in a list.
+		# (make sure to handle less than N partitions remaining)
+		# Start (or reuse) a helper and pass on all of them.
+		# After every partition we have done ourselves, check for results from the helper
+		# and incorporate them into our del_values.
+		# If the helper has no more partitions to do, go back to top.
+		# If we get done, make sure to wait until no helper results are outstanding too.
+
+		partition_generator = self.generate_partitions_of_bag_of_size(bag, self.h)
+		start_time = time.time()
+
+		HELPER_PARTITION_COUNT = 20
+		hlp = None
+		hlp_wq = None
+		hlp_rq = None
+		hlp_queued_count = 0
+
+		for P in partition_generator:
+			print("Got a partition with length %d" % (len(P)))
+			if (hlp == None):
+				current_time = time.time()
+				if (current_time - start_time > 0.1 * 60):
+					(hlp, hlp_wq, hlp_rq) = self.launch_join_helper(HELPER_PARTITION_COUNT)
+
+			if (hlp != None):
+				try:
+					while True:
+						result_list = hlp_rq.get_nowait()
+						hlp_queued_count -= 1
+
+						for (state, min_value_set, min_value) in result_list:
+							if (min_value <= self.k):
+								del_values[join_node, state] = (min_value_set, min_value)
+						print("[P%d] Received helper result..." % self.process_index)
+				except queue.Empty:
+					pass
+
+				if (hlp_queued_count == 0):
+					try:
+						for i in range(HELPER_PARTITION_COUNT):
+							part = next(partition_generator)
+							hlp_wq.put(part)
+							hlp_queued_count += 1
+					except StopIteration:
+						pass
+
+			partition_1 = P
+			partition_2 = P
+			edges_connecting_blocks_in_partition = self.edges_connecting_blocks_in_partition(bag, P)
+
+			for c in self.generate_all_functions_from_partition_to_range(P, self.h):
+				sigma_t1_t2_join = set()
+				all_function_pairs = self.get_all_function_pairs(P, c)
+
+				for (c_1, c_2) in all_function_pairs:
+					sigma_t1_t2_join.add(((partition_1, c_1), (partition_2, c_2)))
+				
+				minValue = math.inf
+				minValueSet = set()
+				for (sigma_1, sigma_2) in sigma_t1_t2_join:
+					tuple_child_1 = del_values_child.get((child_1, sigma_1), (set(), math.inf))
+					tuple_child_2 = del_values_child.get((child_2, sigma_2), (set(), math.inf))
+
+					value = (tuple_child_1[1] + tuple_child_2[1] 
+							- len(edges_connecting_blocks_in_partition))
+
+					if(value < minValue):
+						minValue = value
+						# minValueSet = edges_connecting_blocks_in_partition
+						minValueSet = tuple_child_1[0].union(tuple_child_2[0])#.difference(edges_connecting_blocks_in_partition)
+						#edges_connecting_blocks_in_partition
+
+				if(minValue <= self.k):
+					del_values[join_node, (P, c)] = (minValueSet, minValue)
+				#else:
+				#	del_values[join_node, (P, c)] = (set(), math.inf)
+
+		if (hlp != None):
+			while hlp_queued_count > 0:
+				result_list = hlp_rq.get_nowait()
+				hlp_queued_count -= 1
+				for (state, min_value_set, min_value) in result_list:
+					if (min_value <= self.k):
+						del_values[join_node, state] = (min_value_set, min_value)
+				print("[P%d] Received helper result..." % self.process_index)
+			hlp_wq.put(None)
+			hlp.join()
+
+		return del_values
+
+
+	def find_component_signatures_of_join_nodes_with_part(self, node, bag, child_1, child_2, child_signatures, P):
+		results = list()
+
+		partition_1 = P
+		partition_2 = P
+		edges_connecting_blocks_in_partition = self.edges_connecting_blocks_in_partition(bag, P)
+
+		for c in self.generate_all_functions_from_partition_to_range(P, self.h):
+			sigma_t1_t2_join = set()
+			all_function_pairs = self.get_all_function_pairs(P, c)
+
+			for (c_1, c_2) in all_function_pairs:
+				sigma_t1_t2_join.add(((partition_1, c_1), (partition_2, c_2)))
+			
+			minValue = math.inf
+			minValueSet = set()
+			for (sigma_1, sigma_2) in sigma_t1_t2_join:
+				tuple_child_1 = del_values_child.get((child_1, sigma_1), (set(), math.inf))
+				tuple_child_2 = del_values_child.get((child_2, sigma_2), (set(), math.inf))
+
+				value = (tuple_child_1[1] + tuple_child_2[1] 
+						- len(edges_connecting_blocks_in_partition))
+
+				if(value < minValue):
+					minValue = value
+					# minValueSet = edges_connecting_blocks_in_partition
+					minValueSet = tuple_child_1[0].union(tuple_child_2[0])#.difference(edges_connecting_blocks_in_partition)
+					#edges_connecting_blocks_in_partition
+
+			results.append(((P, c), minValueSet, minValue))
 
 	def get_all_function_pairs(self, partition, c):
 		all_function_pairs = set()
