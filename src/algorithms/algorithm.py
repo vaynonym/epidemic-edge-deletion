@@ -338,13 +338,14 @@ class AlgorithmWorker:
 			child_2 = children[1]
 			return self.find_component_signatures_of_join_nodes(node, node.bag, child_1, child_2, child_component_signatures)
 
-	# (hlp, hlp_wq, hlp_rq) = self.launch_join_helper(HELPER_PARTITION_COUNT)
 	def launch_join_helper(self, node, child_1, child_2, child_signatures, queue_capacity):
 		wq = multiprocessing.Queue(queue_capacity)
 		rq = multiprocessing.Queue(queue_capacity)
+		print("Starting a join helper...")
 		p = multiprocessing.Process(target=join_helper,
 			args=(self.graph, self.nice_tree_decomposition, self.h, self.k, node, child_1, child_2, child_signatures, wq, rq))
 		p.start()
+		return (p, wq, rq)
 
 	def generate_possible_component_states_of_bag(self, bag, h):
 		for partition in self.generate_partitions_of_bag_of_size(bag, h):
@@ -614,7 +615,7 @@ class AlgorithmWorker:
 		partition_generator = self.generate_partitions_of_bag_of_size(bag, self.h)
 		start_time = time.time()
 
-		HELPER_PARTITION_COUNT = 20
+		HELPER_PARTITION_COUNT = 5
 		hlp = None
 		hlp_wq = None
 		hlp_rq = None
@@ -625,7 +626,7 @@ class AlgorithmWorker:
 			if (hlp == None):
 				current_time = time.time()
 				if (current_time - start_time > 0.1 * 60):
-					(hlp, hlp_wq, hlp_rq) = self.launch_join_helper(HELPER_PARTITION_COUNT)
+					(hlp, hlp_wq, hlp_rq) = self.launch_join_helper(join_node, child_1, child_2, del_values_child, HELPER_PARTITION_COUNT)
 
 			if (hlp != None):
 				try:
@@ -694,7 +695,7 @@ class AlgorithmWorker:
 		return del_values
 
 
-	def find_component_signatures_of_join_nodes_with_part(self, node, bag, child_1, child_2, child_signatures, P):
+	def find_component_signatures_of_join_nodes_with_part(self, join_node, bag, child_1, child_2, del_values_child, P):
 		results = list()
 
 		partition_1 = P
