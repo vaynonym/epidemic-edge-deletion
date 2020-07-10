@@ -4,4 +4,5 @@
 *.swp
 .vscode/
 output/
+data/graph_*
 
