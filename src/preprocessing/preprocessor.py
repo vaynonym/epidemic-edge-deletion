@@ -43,6 +43,8 @@ class Preprocessor:
 		name_dictionary = dict()
 		position_dictionary = dict()
 
+		identifier_district_pair = []
+
 		identifier_to_district_dictionary = dict()
 		ID_to_district_dictionary = dict()
 		identifier = 0
@@ -55,7 +57,9 @@ class Preprocessor:
 		for district in district_list:
 			identifier_to_district_dictionary[identifier] = district
 			ID_to_district_dictionary[district.district_ID] = district
+			identifier_district_pair.append((identifier, district))
 			identifier += 1
+			
 		
 		with open("data/RKI_COVID19_filtered.csv") as csvfile:
 			csvreader = csv.reader(csvfile)
@@ -71,7 +75,7 @@ class Preprocessor:
 			# reset to beginning of file
 			csvfile.seek(0)
 			next(csvreader)
-			last_date = first_date + datetime.timedelta(days=45)
+			last_date = first_date + datetime.timedelta(days=43)
 			total_cases_in_timeframe = 0
 			for row in csvreader:
 				date = datetime.datetime.strptime(row[2], "%Y/%m/%d").date()
@@ -88,7 +92,11 @@ class Preprocessor:
 				name_dictionary[i] = district1.district_name
 				position_dictionary[i] = district1.polygon_coordinate
 		else:
-			for i in range(identifier):
+			district_order = list(identifier_district_pair)
+			district_order.sort(key=lambda district: district[1].number_of_cases, reverse=True)
+			for districtx in district_order:
+			#for i in range(identifier):
+				i = districtx[0]
 				district_graph.add_node(i)
 				district1 = identifier_to_district_dictionary[i]
 				name_dictionary[i] = district1.district_name
@@ -100,8 +108,10 @@ class Preprocessor:
 						#	district1.neighbours.append(district2)    
 						#if(not district1 in district2.neighbours):
 						#	district2.neighbours.append(district1)
-						if(district1.number_of_cases >= normal(40, 10)):
-							district_graph.add_edge(i, j)
+						#if(district1.number_of_cases >= normal(30, 10)):
+						district_graph.add_edge(i, j)
+						if(nx.algorithms.approximation.treewidth.treewidth_min_degree(district_graph)[0]>4):
+							district_graph.remove_edge(i, j)
 				print("Finished {count} out of {max_count}".format(count = i, max_count = identifier))
 			save(district_graph, graph_file_name)
 			save_graph_file(district_graph)
